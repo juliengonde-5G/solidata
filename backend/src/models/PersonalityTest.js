@@ -23,13 +23,11 @@ const PersonalityTest = sequelize.define('PersonalityTest', {
   // Résultats PCM - les 6 types de personnalité selon Kahler
   baseType: {
     type: DataTypes.ENUM('empathique', 'travaillomane', 'perseverant', 'reveur', 'promoteur', 'rebelle'),
-    allowNull: true,
-    comment: 'Type de base PCM du candidat'
+    allowNull: true
   },
   phaseType: {
     type: DataTypes.ENUM('empathique', 'travaillomane', 'perseverant', 'reveur', 'promoteur', 'rebelle'),
-    allowNull: true,
-    comment: 'Phase actuelle PCM du candidat'
+    allowNull: true
   },
   // Scores pour chaque type (0-100)
   scores: {
