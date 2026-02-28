@@ -32,8 +32,7 @@ const User = sequelize.define('User', {
   },
   team: {
     type: DataTypes.ENUM('tri', 'collecte', 'magasin_lhopital', 'magasin_st_sever', 'magasin_vernon', 'administration'),
-    allowNull: true,
-    comment: 'Équipe d\'affectation'
+    allowNull: true
   },
   phone: {
     type: DataTypes.STRING
