@@ -3,10 +3,12 @@ const { body, validationResult } = require('express-validator');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { Candidate, CandidateHistory, JobPosition, PersonalityTest } = require('../../models');
+const { Candidate, CandidateHistory, JobPosition, PersonalityTest, Employee, User } = require('../../models');
 const { authenticate, requireRole } = require('../../middleware/auth');
 
 const router = express.Router();
+
+const VALID_STATUSES = ['candidature_recue', 'a_qualifier', 'non_retenu', 'convoque', 'recrute'];
 
 // Configuration multer pour upload CV
 const storage = multer.diskStorage({
@@ -31,10 +33,10 @@ const upload = multer({
   }
 });
 
-// GET /api/recruitment/candidates - Liste avec filtrage par statut (Kanban)
+// GET /api/recruitment/candidates - Liste avec filtrage par statut
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, search } = req.query;
     const where = {};
     if (status) where.status = status;
 
@@ -43,7 +45,8 @@ router.get('/', authenticate, async (req, res) => {
       include: [
         { model: JobPosition, as: 'jobPosition', attributes: ['id', 'title', 'department'] },
         { model: CandidateHistory, as: 'history', order: [['changedAt', 'DESC']] },
-        { model: PersonalityTest, as: 'personalityTest', attributes: ['id', 'status', 'baseType', 'phaseType'] }
+        { model: PersonalityTest, as: 'personalityTest', attributes: ['id', 'status', 'baseType', 'phaseType'] },
+        { model: User, as: 'interviewer', attributes: ['id', 'firstName', 'lastName'] }
       ],
       order: [['applicationDate', 'DESC']]
     });
@@ -67,10 +70,10 @@ router.get('/kanban', authenticate, async (req, res) => {
 
     const kanban = {
       candidature_recue: [],
-      candidature_rejetee: [],
-      candidature_qualifiee: [],
-      entretien_confirme: [],
-      recrutement_valide: []
+      a_qualifier: [],
+      non_retenu: [],
+      convoque: [],
+      recrute: []
     };
 
     candidates.forEach(c => {
@@ -86,6 +89,21 @@ router.get('/kanban', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/recruitment/candidates/users - Liste des utilisateurs pour sélection interviewer
+router.get('/users', authenticate, async (req, res) => {
+  try {
+    const users = await User.findAll({
+      where: { active: true },
+      attributes: ['id', 'firstName', 'lastName', 'role', 'team'],
+      order: [['lastName', 'ASC']]
+    });
+    res.json(users);
+  } catch (err) {
+    console.error('Get users error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // GET /api/recruitment/candidates/:id
 router.get('/:id', authenticate, async (req, res) => {
   try {
@@ -93,7 +111,8 @@ router.get('/:id', authenticate, async (req, res) => {
       include: [
         { model: JobPosition, as: 'jobPosition' },
         { model: CandidateHistory, as: 'history', order: [['changedAt', 'DESC']] },
-        { model: PersonalityTest, as: 'personalityTest' }
+        { model: PersonalityTest, as: 'personalityTest' },
+        { model: User, as: 'interviewer', attributes: ['id', 'firstName', 'lastName'] }
       ]
     });
     if (!candidate) {
@@ -117,6 +136,8 @@ router.post('/', authenticate, upload.single('cv'), async (req, res) => {
       phone: req.body.phone,
       applicationDate: req.body.applicationDate || new Date(),
       status: 'candidature_recue',
+      permisB: req.body.permisB === 'true' || req.body.permisB === true,
+      caces: req.body.caces === 'true' || req.body.caces === true,
       comments: req.body.comments
     };
 
@@ -163,6 +184,17 @@ router.put('/:id', authenticate, upload.single('cv'), async (req, res) => {
       updateData.cvOriginalName = req.file.originalname;
     }
 
+    // Convertir booléens depuis FormData
+    if (updateData.permisB !== undefined) {
+      updateData.permisB = updateData.permisB === 'true' || updateData.permisB === true;
+    }
+    if (updateData.caces !== undefined) {
+      updateData.caces = updateData.caces === 'true' || updateData.caces === true;
+    }
+    if (updateData.assessmentDone !== undefined) {
+      updateData.assessmentDone = updateData.assessmentDone === 'true' || updateData.assessmentDone === true;
+    }
+
     // Si changement de statut → historiser
     if (updateData.status && updateData.status !== candidate.status) {
       await CandidateHistory.create({
@@ -181,7 +213,8 @@ router.put('/:id', authenticate, upload.single('cv'), async (req, res) => {
       include: [
         { model: JobPosition, as: 'jobPosition' },
         { model: CandidateHistory, as: 'history', order: [['changedAt', 'DESC']] },
-        { model: PersonalityTest, as: 'personalityTest' }
+        { model: PersonalityTest, as: 'personalityTest' },
+        { model: User, as: 'interviewer', attributes: ['id', 'firstName', 'lastName'] }
       ]
     });
 
@@ -194,10 +227,7 @@ router.put('/:id', authenticate, upload.single('cv'), async (req, res) => {
 
 // PUT /api/recruitment/candidates/:id/move - Déplacement Kanban
 router.put('/:id/move', authenticate, [
-  body('status').isIn([
-    'candidature_recue', 'candidature_rejetee', 'candidature_qualifiee',
-    'entretien_confirme', 'recrutement_valide'
-  ]).withMessage('Statut invalide')
+  body('status').isIn(VALID_STATUSES).withMessage('Statut invalide')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -227,8 +257,8 @@ router.put('/:id/move', authenticate, [
 
     await candidate.update({ status: toStatus });
 
-    // Si recrutement validé, incrémenter les postes pourvus
-    if (toStatus === 'recrutement_valide' && candidate.jobPositionId) {
+    // Si recruté, incrémenter les postes pourvus
+    if (toStatus === 'recrute' && candidate.jobPositionId) {
       const position = await JobPosition.findByPk(candidate.jobPositionId);
       if (position) {
         await position.increment('filledPositions');
@@ -239,13 +269,101 @@ router.put('/:id/move', authenticate, [
       include: [
         { model: JobPosition, as: 'jobPosition' },
         { model: CandidateHistory, as: 'history', order: [['changedAt', 'DESC']] },
-        { model: PersonalityTest, as: 'personalityTest' }
+        { model: PersonalityTest, as: 'personalityTest' },
+        { model: User, as: 'interviewer', attributes: ['id', 'firstName', 'lastName'] }
       ]
     });
 
     res.json(updated);
   } catch (err) {
     console.error('Move candidate error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/recruitment/candidates/:id/recruit - Finaliser le recrutement et créer la fiche salarié
+router.post('/:id/recruit', authenticate, [
+  body('team').notEmpty().withMessage('L\'équipe est requise'),
+  body('department').notEmpty().withMessage('Le département est requis'),
+  body('contractType').notEmpty().withMessage('Le type de contrat est requis')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const candidate = await Candidate.findByPk(req.params.id, {
+      include: [{ model: JobPosition, as: 'jobPosition' }]
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ error: 'Candidat non trouvé' });
+    }
+
+    if (candidate.status !== 'convoque' && candidate.status !== 'recrute') {
+      return res.status(400).json({ error: 'Le candidat doit être au statut "convoqué" ou "recruté" pour être recruté' });
+    }
+
+    const { team, department, contractType, hireDate, contractEndDate } = req.body;
+
+    // Créer la fiche salarié
+    const employee = await Employee.create({
+      firstName: candidate.firstName,
+      lastName: candidate.lastName,
+      email: candidate.email,
+      phone: candidate.phone,
+      department: department,
+      contractType: contractType,
+      hireDate: hireDate || new Date(),
+      contractEndDate: contractEndDate || null,
+      drivingLicense: candidate.permisB,
+      active: true,
+      notes: `Recruté via candidature du ${new Date(candidate.applicationDate).toLocaleDateString('fr-FR')}. Poste: ${candidate.jobPosition?.title || 'Non spécifié'}.`
+    });
+
+    // Mettre à jour le candidat
+    const updateData = {
+      status: 'recrute',
+      assignedTeam: team
+    };
+
+    if (candidate.status !== 'recrute') {
+      await CandidateHistory.create({
+        candidateId: candidate.id,
+        fromStatus: candidate.status,
+        toStatus: 'recrute',
+        changedBy: req.user.id,
+        comment: `Recruté - Affecté à l'équipe ${team}. Fiche salarié créée.`
+      });
+    }
+
+    await candidate.update(updateData);
+
+    // Incrémenter les postes pourvus
+    if (candidate.jobPositionId) {
+      const position = await JobPosition.findByPk(candidate.jobPositionId);
+      if (position) {
+        await position.increment('filledPositions');
+      }
+    }
+
+    const updated = await Candidate.findByPk(candidate.id, {
+      include: [
+        { model: JobPosition, as: 'jobPosition' },
+        { model: CandidateHistory, as: 'history', order: [['changedAt', 'DESC']] },
+        { model: PersonalityTest, as: 'personalityTest' },
+        { model: User, as: 'interviewer', attributes: ['id', 'firstName', 'lastName'] }
+      ]
+    });
+
+    res.json({
+      candidate: updated,
+      employee: employee,
+      message: `Fiche salarié créée pour ${employee.firstName} ${employee.lastName}`
+    });
+  } catch (err) {
+    console.error('Recruit candidate error:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -257,7 +375,8 @@ router.get('/:id/summary', authenticate, async (req, res) => {
       include: [
         { model: JobPosition, as: 'jobPosition' },
         { model: CandidateHistory, as: 'history', order: [['changedAt', 'ASC']] },
-        { model: PersonalityTest, as: 'personalityTest' }
+        { model: PersonalityTest, as: 'personalityTest' },
+        { model: User, as: 'interviewer', attributes: ['id', 'firstName', 'lastName'] }
       ]
     });
 
@@ -265,8 +384,8 @@ router.get('/:id/summary', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Candidat non trouvé' });
     }
 
-    if (candidate.status !== 'recrutement_valide') {
-      return res.status(400).json({ error: 'La fiche synthétique n\'est disponible que pour les recrutements validés' });
+    if (candidate.status !== 'recrute') {
+      return res.status(400).json({ error: 'La fiche synthétique n\'est disponible que pour les candidats recrutés' });
     }
 
     const summary = {
@@ -275,7 +394,9 @@ router.get('/:id/summary', authenticate, async (req, res) => {
         prenom: candidate.firstName,
         genre: candidate.gender,
         email: candidate.email,
-        telephone: candidate.phone
+        telephone: candidate.phone,
+        permisB: candidate.permisB,
+        caces: candidate.caces
       },
       candidature: {
         dateReception: candidate.applicationDate,
@@ -283,17 +404,28 @@ router.get('/:id/summary', authenticate, async (req, res) => {
           titre: candidate.jobPosition.title,
           departement: candidate.jobPosition.department
         } : null,
+        equipeAffectee: candidate.assignedTeam,
         dateValidation: candidate.history
-          .find(h => h.toStatus === 'recrutement_valide')?.changedAt
+          .find(h => h.toStatus === 'recrute')?.changedAt
       },
       evaluations: {
-        compteRenduEntretien: candidate.interviewReport,
-        compteRenduTest: candidate.testReport,
+        miseEnSituation: {
+          realise: candidate.assessmentDone,
+          avis: candidate.assessmentResult,
+          commentaire: candidate.assessmentComment
+        },
+        entretien: {
+          responsable: candidate.interviewer ? `${candidate.interviewer.firstName} ${candidate.interviewer.lastName}` : null,
+          date: candidate.interviewDate,
+          commentaire: candidate.interviewComment
+        },
         profilPersonnalite: candidate.personalityTest ? {
           typeBase: candidate.personalityTest.baseType,
           phase: candidate.personalityTest.phaseType,
           scores: candidate.personalityTest.scores,
           comportementsSousStress: candidate.personalityTest.stressBehaviors,
+          comportementCollectif: candidate.personalityTest.collectiveBehavior,
+          forcesEtFaiblesses: candidate.personalityTest.strengthsWeaknesses,
           facteursRPS: candidate.personalityTest.riskFactors,
           synthese: candidate.personalityTest.summary
         } : null

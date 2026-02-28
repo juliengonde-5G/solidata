@@ -5,10 +5,10 @@ import { Users, Briefcase, CheckCircle, Clock } from 'lucide-react';
 
 const STATUS_LABELS = {
   candidature_recue: 'Candidatures reçues',
-  candidature_qualifiee: 'Qualifiées',
-  entretien_confirme: 'Entretiens confirmés',
-  recrutement_valide: 'Recrutements validés',
-  candidature_rejetee: 'Rejetées'
+  a_qualifier: 'À qualifier',
+  non_retenu: 'Non retenu',
+  convoque: 'Convoqués',
+  recrute: 'Recrutés'
 };
 
 export default function Dashboard() {
@@ -91,9 +91,9 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">
-                {stats.byStatus.find(s => s.status === 'entretien_confirme')?.count || 0}
+                {stats.byStatus.find(s => s.status === 'convoque')?.count || 0}
               </p>
-              <p className="text-sm text-gray-500">Entretiens à venir</p>
+              <p className="text-sm text-gray-500">Convoqués</p>
             </div>
           </div>
         </div>
@@ -105,9 +105,9 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">
-                {stats.byStatus.find(s => s.status === 'recrutement_valide')?.count || 0}
+                {stats.byStatus.find(s => s.status === 'recrute')?.count || 0}
               </p>
-              <p className="text-sm text-gray-500">Recrutements validés</p>
+              <p className="text-sm text-gray-500">Recrutés</p>
             </div>
           </div>
         </div>
@@ -117,14 +117,14 @@ export default function Dashboard() {
       <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Pipeline de recrutement</h2>
         <div className="flex gap-2 items-end h-40">
-          {stats.byStatus.filter(s => s.status !== 'candidature_rejetee').map(({ status, label, count }) => {
+          {stats.byStatus.filter(s => s.status !== 'non_retenu').map(({ status, label, count }) => {
             const maxCount = Math.max(...stats.byStatus.map(s => s.count), 1);
             const height = Math.max((count / maxCount) * 100, 8);
             const colors = {
-              candidature_recue: 'bg-kanban-received',
-              candidature_qualifiee: 'bg-kanban-qualified',
-              entretien_confirme: 'bg-kanban-interview',
-              recrutement_valide: 'bg-kanban-validated'
+              candidature_recue: 'bg-blue-400',
+              a_qualifier: 'bg-amber-400',
+              convoque: 'bg-purple-400',
+              recrute: 'bg-green-400'
             };
             return (
               <div key={status} className="flex-1 flex flex-col items-center gap-2">

@@ -20,7 +20,8 @@ router.get('/questions', (req, res) => {
       visualHint: q.visualHint,
       options: q.options.map(o => ({
         id: o.id,
-        text: o.text
+        text: o.text,
+        emoji: o.emoji
       }))
     }))
   });
@@ -55,12 +56,14 @@ router.post('/start/:candidateId', authenticate, async (req, res) => {
       testId: test.id,
       status: test.status,
       responses: test.responses,
+      // Inclure le lien public pour le candidat
+      publicLink: `/test-personnalite/${test.id}`,
       questions: PCM_QUESTIONS.map(q => ({
         id: q.id,
         category: q.category,
         text: q.text,
         visualHint: q.visualHint,
-        options: q.options.map(o => ({ id: o.id, text: o.text }))
+        options: q.options.map(o => ({ id: o.id, text: o.text, emoji: o.emoji }))
       }))
     });
   } catch (err) {
@@ -69,7 +72,32 @@ router.post('/start/:candidateId', authenticate, async (req, res) => {
   }
 });
 
-// PUT /api/recruitment/personality/:testId/answer - Sauvegarder une réponse
+// GET /api/recruitment/personality/:testId/status - Statut du test (public)
+router.get('/:testId/status', async (req, res) => {
+  try {
+    const test = await PersonalityTest.findByPk(req.params.testId, {
+      include: [{ model: Candidate, attributes: ['firstName', 'lastName'] }]
+    });
+
+    if (!test) {
+      return res.status(404).json({ error: 'Test non trouvé' });
+    }
+
+    res.json({
+      testId: test.id,
+      status: test.status,
+      candidateName: test.Candidate ? `${test.Candidate.firstName}` : null,
+      answeredQuestions: test.responses?.length || 0,
+      totalQuestions: PCM_QUESTIONS.length,
+      isComplete: test.status === 'completed'
+    });
+  } catch (err) {
+    console.error('Status error:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// PUT /api/recruitment/personality/:testId/answer - Sauvegarder une réponse (public)
 router.put('/:testId/answer', [
   body('questionId').notEmpty(),
   body('answer').notEmpty()
@@ -114,7 +142,7 @@ router.put('/:testId/answer', [
   }
 });
 
-// POST /api/recruitment/personality/:testId/complete - Finaliser le test
+// POST /api/recruitment/personality/:testId/complete - Finaliser le test (public)
 router.post('/:testId/complete', async (req, res) => {
   try {
     const test = await PersonalityTest.findByPk(req.params.testId);
@@ -134,7 +162,7 @@ router.post('/:testId/complete', async (req, res) => {
       });
     }
 
-    // Calculer les résultats
+    // Calculer les résultats enrichis
     const results = processTestResults(test.responses);
 
     await test.update({
@@ -145,6 +173,8 @@ router.post('/:testId/complete', async (req, res) => {
       stressBehaviors: results.stressBehaviors,
       riskFactors: results.riskFactors,
       incompatibilities: results.incompatibilities,
+      collectiveBehavior: results.collectiveBehavior,
+      strengthsWeaknesses: results.strengthsWeaknesses,
       summary: results.summary,
       completedAt: new Date()
     });
@@ -159,7 +189,9 @@ router.post('/:testId/complete', async (req, res) => {
         summary: results.summary,
         stressBehaviors: results.stressBehaviors,
         riskFactors: results.riskFactors,
-        incompatibilities: results.incompatibilities
+        incompatibilities: results.incompatibilities,
+        collectiveBehavior: results.collectiveBehavior,
+        strengthsWeaknesses: results.strengthsWeaknesses
       }
     });
   } catch (err) {
@@ -193,7 +225,9 @@ router.get('/:testId/results', authenticate, async (req, res) => {
       summary: test.summary,
       stressBehaviors: test.stressBehaviors,
       riskFactors: test.riskFactors,
-      incompatibilities: test.incompatibilities
+      incompatibilities: test.incompatibilities,
+      collectiveBehavior: test.collectiveBehavior,
+      strengthsWeaknesses: test.strengthsWeaknesses
     });
   } catch (err) {
     console.error('Get results error:', err);

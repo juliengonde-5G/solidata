@@ -58,9 +58,20 @@ const PersonalityTest = sequelize.define('PersonalityTest', {
     defaultValue: null,
     comment: 'Incompatibilités potentielles avec autres profils'
   },
+  // Nouvelles analyses enrichies
+  collectiveBehavior: {
+    type: DataTypes.JSONB,
+    defaultValue: null,
+    comment: 'Comportement en milieu collectif'
+  },
+  strengthsWeaknesses: {
+    type: DataTypes.JSONB,
+    defaultValue: null,
+    comment: 'Forces et faiblesses détaillées'
+  },
   summary: {
     type: DataTypes.TEXT,
-    comment: 'Synthèse du profil de personnalité'
+    comment: 'Synthèse complète du profil de personnalité'
   },
   completedAt: {
     type: DataTypes.DATE

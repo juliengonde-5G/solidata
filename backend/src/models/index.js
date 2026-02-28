@@ -27,6 +27,9 @@ CandidateHistory.belongsTo(User, { foreignKey: 'changedBy', as: 'changedByUser' 
 Candidate.hasOne(PersonalityTest, { foreignKey: 'candidateId', as: 'personalityTest' });
 PersonalityTest.belongsTo(Candidate, { foreignKey: 'candidateId' });
 
+// Lien candidat → interviewer (User)
+Candidate.belongsTo(User, { foreignKey: 'interviewerId', as: 'interviewer' });
+
 // === Associations Équipe ===
 Employee.hasMany(Skill, { foreignKey: 'employeeId', as: 'skills' });
 Skill.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });

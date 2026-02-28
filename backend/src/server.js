@@ -71,7 +71,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     name: 'Solidata ERP',
-    version: '2.0.0',
+    version: '2.1.0',
     modules: ['recruitment', 'team', 'collection', 'reporting', 'admin']
   });
 });
@@ -82,7 +82,7 @@ async function start() {
     await sequelize.authenticate();
     console.log('Connexion à la base de données établie');
 
-    // Migration des enums si nécessaire (PostgreSQL ne supporte pas ALTER ENUM facilement)
+    // === Migration des enums et statuts ===
     try {
       // Migrer l'enum role : ajouter les nouvelles valeurs
       await sequelize.query(`ALTER TYPE "enum_users_role" ADD VALUE IF NOT EXISTS 'collaborateur'`).catch(() => {});
@@ -97,6 +97,24 @@ async function start() {
       // Migrer les anciens rôles
       await sequelize.query(`UPDATE users SET role = 'collaborateur' WHERE role = 'user'`).catch(() => {});
       await sequelize.query(`UPDATE users SET role = 'collaborateur' WHERE role = 'external'`).catch(() => {});
+
+      // === Migration statuts Kanban candidats ===
+      // Convertir la colonne status d'ENUM en VARCHAR si nécessaire
+      const [statusCol] = await sequelize.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'candidates' AND column_name = 'status'
+      `).catch(() => [[]]);
+      if (statusCol && statusCol.length > 0 && statusCol[0].data_type === 'USER-DEFINED') {
+        console.log('Migration statuts candidats: ENUM → VARCHAR...');
+        await sequelize.query(`ALTER TABLE candidates ALTER COLUMN status TYPE VARCHAR(50) USING status::text`);
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_candidates_status"`);
+      }
+      // Mapper les anciens statuts vers les nouveaux
+      await sequelize.query(`UPDATE candidates SET status = 'a_qualifier' WHERE status = 'candidature_qualifiee'`).catch(() => {});
+      await sequelize.query(`UPDATE candidates SET status = 'non_retenu' WHERE status = 'candidature_rejetee'`).catch(() => {});
+      await sequelize.query(`UPDATE candidates SET status = 'convoque' WHERE status = 'entretien_confirme'`).catch(() => {});
+      await sequelize.query(`UPDATE candidates SET status = 'recrute' WHERE status = 'recrutement_valide'`).catch(() => {});
+
       console.log('Migration des enums terminée');
     } catch (err) {
       console.log('Migration enums (ignoré):', err.message);

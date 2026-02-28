@@ -2,23 +2,23 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../utils/api';
 import {
-  Inbox, XCircle, CheckCircle, Calendar, Award,
-  Plus, ChevronRight, FileText, User
+  Inbox, XCircle, Search, Phone, Award,
+  Plus, ChevronRight, FileText, User, Car, Wrench
 } from 'lucide-react';
 
 const COLUMNS = [
-  { key: 'candidature_recue', label: 'Candidatures reçues', icon: Inbox, color: 'border-kanban-received', bgHeader: 'bg-blue-50', textColor: 'text-blue-700' },
-  { key: 'candidature_qualifiee', label: 'Qualifiées', icon: CheckCircle, color: 'border-kanban-qualified', bgHeader: 'bg-amber-50', textColor: 'text-amber-700' },
-  { key: 'entretien_confirme', label: 'Entretien confirmé', icon: Calendar, color: 'border-kanban-interview', bgHeader: 'bg-purple-50', textColor: 'text-purple-700' },
-  { key: 'recrutement_valide', label: 'Recrutement validé', icon: Award, color: 'border-kanban-validated', bgHeader: 'bg-green-50', textColor: 'text-green-700' },
-  { key: 'candidature_rejetee', label: 'Rejetées', icon: XCircle, color: 'border-kanban-rejected', bgHeader: 'bg-red-50', textColor: 'text-red-700' },
+  { key: 'candidature_recue', label: 'Candidatures reçues', icon: Inbox, color: 'border-blue-400', bgHeader: 'bg-blue-50', textColor: 'text-blue-700' },
+  { key: 'a_qualifier', label: 'À qualifier', icon: Search, color: 'border-amber-400', bgHeader: 'bg-amber-50', textColor: 'text-amber-700' },
+  { key: 'non_retenu', label: 'Non retenu', icon: XCircle, color: 'border-red-400', bgHeader: 'bg-red-50', textColor: 'text-red-700' },
+  { key: 'convoque', label: 'Convoqué', icon: Phone, color: 'border-purple-400', bgHeader: 'bg-purple-50', textColor: 'text-purple-700' },
+  { key: 'recrute', label: 'Recruté', icon: Award, color: 'border-green-400', bgHeader: 'bg-green-50', textColor: 'text-green-700' },
 ];
 
 export default function KanbanBoard() {
   const [kanban, setKanban] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newCandidate, setNewCandidate] = useState({ firstName: '', lastName: '', email: '' });
+  const [newCandidate, setNewCandidate] = useState({ firstName: '', lastName: '', email: '', permisB: false, caces: false });
   const [cvFile, setCvFile] = useState(null);
 
   const fetchKanban = async () => {
@@ -53,6 +53,8 @@ export default function KanbanBoard() {
       formData.append('firstName', newCandidate.firstName);
       formData.append('lastName', newCandidate.lastName);
       formData.append('email', newCandidate.email);
+      formData.append('permisB', newCandidate.permisB);
+      formData.append('caces', newCandidate.caces);
       if (cvFile) formData.append('cv', cvFile);
 
       await api.post('/recruitment/candidates', formData, {
@@ -60,7 +62,7 @@ export default function KanbanBoard() {
       });
 
       setShowAddModal(false);
-      setNewCandidate({ firstName: '', lastName: '', email: '' });
+      setNewCandidate({ firstName: '', lastName: '', email: '', permisB: false, caces: false });
       setCvFile(null);
       fetchKanban();
     } catch (err) {
@@ -174,6 +176,28 @@ export default function KanbanBoard() {
                   className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-soltex-green/10 file:text-soltex-green hover:file:bg-soltex-green/20"
                 />
               </div>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newCandidate.permisB}
+                    onChange={e => setNewCandidate({ ...newCandidate, permisB: e.target.checked })}
+                    className="w-4 h-4 text-soltex-green rounded focus:ring-soltex-green"
+                  />
+                  <Car className="w-4 h-4 text-gray-400" />
+                  Permis B
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newCandidate.caces}
+                    onChange={e => setNewCandidate({ ...newCandidate, caces: e.target.checked })}
+                    className="w-4 h-4 text-soltex-green rounded focus:ring-soltex-green"
+                  />
+                  <Wrench className="w-4 h-4 text-gray-400" />
+                  CACES
+                </label>
+              </div>
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -226,21 +250,29 @@ function CandidateCard({ candidate, currentStatus, onMove }) {
           )}
         </div>
 
-        {candidate.jobPosition && (
-          <div className="mt-2">
-            <span className="text-xs bg-soltex-green/10 text-soltex-green px-2 py-1 rounded-full">
+        {/* Badges */}
+        <div className="mt-2 flex flex-wrap gap-1">
+          {candidate.jobPosition && (
+            <span className="text-xs bg-soltex-green/10 text-soltex-green px-2 py-0.5 rounded-full">
               {candidate.jobPosition.title}
             </span>
-          </div>
-        )}
-
-        {candidate.personalityTest?.status === 'completed' && (
-          <div className="mt-2">
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+          )}
+          {candidate.permisB && (
+            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Car className="w-3 h-3" /> B
+            </span>
+          )}
+          {candidate.caces && (
+            <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Wrench className="w-3 h-3" /> CACES
+            </span>
+          )}
+          {candidate.personalityTest?.status === 'completed' && (
+            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
               PCM: {candidate.personalityTest.baseType}
             </span>
-          </div>
-        )}
+          )}
+        </div>
       </Link>
 
       {/* Bouton déplacer */}

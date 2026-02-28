@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../utils/api';
-import { ArrowLeft, Brain, AlertTriangle, Shield, Users } from 'lucide-react';
+import {
+  ArrowLeft, Brain, AlertTriangle, Shield, Users,
+  ThumbsUp, ThumbsDown, UserCheck, AlertCircle
+} from 'lucide-react';
 
 const TYPE_COLORS = {
   empathique: { bg: 'bg-pink-100', text: 'text-pink-700', bar: 'bg-pink-500' },
@@ -81,6 +84,31 @@ export default function PersonalityResults() {
         </div>
       </div>
 
+      {/* Alerte profil à risque */}
+      {results.collectiveBehavior?.risqueAlerte && (
+        <div className={`rounded-xl shadow-sm p-6 mb-6 border-2 ${
+          results.collectiveBehavior.risqueAlerte.level === 'attention'
+            ? 'bg-red-50 border-red-300'
+            : 'bg-amber-50 border-amber-300'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className={`w-6 h-6 flex-shrink-0 mt-0.5 ${
+              results.collectiveBehavior.risqueAlerte.level === 'attention' ? 'text-red-600' : 'text-amber-600'
+            }`} />
+            <div>
+              <h2 className={`font-bold text-lg ${
+                results.collectiveBehavior.risqueAlerte.level === 'attention' ? 'text-red-800' : 'text-amber-800'
+              }`}>
+                Profil à risque ({results.collectiveBehavior.risqueAlerte.type.replace(/_/g, ' ')})
+              </h2>
+              <p className="text-sm mt-1 text-gray-700">
+                {results.collectiveBehavior.risqueAlerte.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Scores */}
         <div className="bg-white rounded-xl shadow-sm p-6">
@@ -105,6 +133,75 @@ export default function PersonalityResults() {
             })}
           </div>
         </div>
+
+        {/* Forces et faiblesses */}
+        {results.strengthsWeaknesses && (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Forces et faiblesses</h2>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <ThumbsUp className="w-4 h-4 text-green-600" />
+                  <p className="text-xs font-semibold text-green-600 uppercase">Forces</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {results.strengthsWeaknesses.forces?.map((f, i) => (
+                    <span key={i} className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">{results.strengthsWeaknesses.contexteForces}</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <ThumbsDown className="w-4 h-4 text-red-500" />
+                  <p className="text-xs font-semibold text-red-500 uppercase">Faiblesses</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {results.strengthsWeaknesses.faiblesses?.map((f, i) => (
+                    <span key={i} className="bg-red-50 text-red-600 px-3 py-1 rounded-full text-sm">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">{results.strengthsWeaknesses.contexteFaiblesses}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Comportement en milieu collectif */}
+        {results.collectiveBehavior && (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-purple-500" />
+              Comportement en milieu collectif
+            </h2>
+            <div className="space-y-3">
+              <div className="bg-blue-50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-blue-600 uppercase mb-1">Intégration</p>
+                <p className="text-sm text-gray-700">{results.collectiveBehavior.integration}</p>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-purple-600 uppercase mb-1">Rôle dans l'équipe</p>
+                <p className="text-sm text-gray-700">{results.collectiveBehavior.roleEquipe}</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-amber-600 uppercase mb-1">Gestion des conflits</p>
+                <p className="text-sm text-gray-700">{results.collectiveBehavior.gestionConflits}</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-green-600 uppercase mb-1">Collaboration</p>
+                <p className="text-sm text-gray-700">{results.collectiveBehavior.collaboration}</p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-3">
+                <p className="text-xs font-semibold text-red-600 uppercase mb-1">Risque collectif</p>
+                <p className="text-sm text-gray-700">{results.collectiveBehavior.risqueCollectif}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Comportements sous stress */}
         <div className="bg-white rounded-xl shadow-sm p-6">
@@ -144,7 +241,7 @@ export default function PersonalityResults() {
               <ul className="space-y-2">
                 {results.riskFactors.facteurs?.map((f, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                    <span className="text-red-400 mt-1">•</span>
+                    <span className="text-red-400 mt-1">-</span>
                     {f}
                   </li>
                 ))}
