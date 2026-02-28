@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.4-alpine
     restart: always
     environment:
       POSTGRES_DB: solidata
@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5003:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U solidata"]
       interval: 10s
@@ -23,23 +23,13 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: always
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn solidata.wsgi:application --bind 0.0.0.0:8000 --workers 2"
     environment:
-      - DATABASE_URL=postgres://solidata:${DB_PASSWORD:-solidata_dev}@db:5432/solidata
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
-      - GEO_COYOTE_API_KEY=${GEO_COYOTE_API_KEY:-}
-      - GEO_COYOTE_API_URL=${GEO_COYOTE_API_URL:-}
+      - DATABASE_URL=postgresql+asyncpg://solidata:${DB_PASSWORD:-solidata_dev}@db:5432/solidata
+      - SECRET_KEY=${SECRET_KEY:-solidata-secret-key-change-in-production}
+      - DEPOT_LAT=49.5008
+      - DEPOT_LON=1.0506
     volumes:
-      - ./backend:/app
-      - static_files:/app/staticfiles
-      - media_files:/app/media
-    ports:
-      - "8000:8000"
+      - upload_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -50,11 +40,10 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "3000:80"
+      - "8083:80"
     depends_on:
       - backend
 
 volumes:
   postgres_data:
-  static_files:
-  media_files:
+  upload_data:

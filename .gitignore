@@ -8,11 +8,9 @@ dist/
 build/
 .eggs/
 
-# Django
+# Backend
 *.log
-db.sqlite3
-staticfiles/
-media/
+uploads/
 
 # Environment
 .env
@@ -21,6 +19,7 @@ media/
 # Node
 node_modules/
 frontend/dist/
+frontend/build/
 
 # IDE
 .vscode/

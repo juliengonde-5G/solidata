@@ -1,0 +1,73 @@
+{
+  "types": {
+    "analyseur": {
+      "label": "Analyseur",
+      "ancien": "Travaillomane",
+      "emoji": "🔍",
+      "color": "#2196F3",
+      "perception": "Pensées factuelles",
+      "canal": "Interrogatif/Informatif",
+      "besoin": "Reconnaissance du travail et structuration du temps",
+      "driver": "Sois parfait",
+      "masque_stress": "Surcontrôle",
+      "description": "Logique, organisé, responsable. Observe, classe, identifie les données."
+    },
+    "perseverant": {
+      "label": "Persévérant",
+      "emoji": "⚖️",
+      "color": "#9C27B0",
+      "perception": "Opinions",
+      "canal": "Interrogatif/Informatif",
+      "besoin": "Reconnaissance des opinions et engagement",
+      "driver": "Sois parfait pour moi",
+      "masque_stress": "Croisade",
+      "description": "Engagé, observateur, consciencieux. Évalue et juge selon ses valeurs."
+    },
+    "empathique": {
+      "label": "Empathique",
+      "emoji": "💛",
+      "color": "#FF9800",
+      "perception": "Émotions",
+      "canal": "Nourricier",
+      "besoin": "Reconnaissance en tant que personne et satisfaction sensorielle",
+      "driver": "Fais plaisir",
+      "masque_stress": "Suradaptation",
+      "description": "Chaleureux, sensible, compatissant. Ressent le monde par les émotions."
+    },
+    "imagineur": {
+      "label": "Imagineur",
+      "ancien": "Rêveur",
+      "emoji": "🌙",
+      "color": "#795548",
+      "perception": "Imagination",
+      "canal": "Directif",
+      "besoin": "Solitude et direction claire",
+      "driver": "Sois fort pour moi",
+      "masque_stress": "Retrait",
+      "description": "Calme, imaginatif, réfléchi. Explore le monde intérieur et l'imaginaire."
+    },
+    "energiseur": {
+      "label": "Énergiseur",
+      "ancien": "Rebelle",
+      "emoji": "⚡",
+      "color": "#4CAF50",
+      "perception": "Réactions",
+      "canal": "Ludique/Émotif",
+      "besoin": "Contact ludique et stimulation",
+      "driver": "Fais effort",
+      "masque_stress": "Blâme",
+      "description": "Spontané, créatif, ludique. Réagit au monde par le fun et l'énergie."
+    },
+    "promoteur": {
+      "label": "Promoteur",
+      "emoji": "🚀",
+      "color": "#F44336",
+      "perception": "Actions",
+      "canal": "Directif",
+      "besoin": "Excitation et action immédiate",
+      "driver": "Sois fort",
+      "masque_stress": "Manipulation",
+      "description": "Adaptable, charmeur, plein de ressources. Agit d'abord, réfléchit ensuite."
+    }
+  }
+}
