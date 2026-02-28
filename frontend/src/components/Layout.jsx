@@ -11,54 +11,132 @@ import {
   Package,
   BarChart3,
   FileSpreadsheet,
+  Settings,
+  ShieldCheck,
   LogOut,
   Menu,
-  X
+  X,
+  User
 } from 'lucide-react';
 import { useState } from 'react';
 
-const navSections = [
-  {
+const TEAM_LABELS = {
+  tri: 'Tri',
+  collecte: 'Collecte',
+  magasin_lhopital: "Mag. L'Hôpital",
+  magasin_st_sever: 'Mag. St Sever',
+  magasin_vernon: 'Mag. Vernon',
+  administration: 'Administration'
+};
+
+const ROLE_LABELS = {
+  admin: 'Administrateur',
+  manager: 'Manager',
+  collaborateur: 'Collaborateur',
+  rh: 'Ressources Humaines'
+};
+
+// Navigation complète — filtrée selon le rôle
+function getNavSections(role, team) {
+  const sections = [];
+
+  // Général : tout le monde voit le tableau de bord (adapté)
+  sections.push({
     title: 'Général',
     items: [
-      { path: '/', label: 'Tableau de bord', icon: LayoutDashboard },
+      { path: '/', label: 'Accueil', icon: LayoutDashboard },
     ]
-  },
-  {
-    title: 'Recrutement',
-    items: [
-      { path: '/recrutement', label: 'Candidatures', icon: Users },
-      { path: '/recrutement/postes', label: 'Postes', icon: Briefcase },
-    ]
-  },
-  {
-    title: 'Équipe',
-    items: [
-      { path: '/equipe', label: 'Salariés', icon: UserCheck },
-      { path: '/equipe/vehicules', label: 'Véhicules', icon: Truck },
-      { path: '/equipe/planning', label: 'Planning', icon: CalendarDays },
-    ]
-  },
-  {
-    title: 'Collecte',
-    items: [
-      { path: '/collecte', label: 'Collectes', icon: Package },
-      { path: '/collecte/tournees', label: 'Tournées', icon: Route },
-    ]
-  },
-  {
-    title: 'Reporting',
-    items: [
-      { path: '/reporting', label: 'Tableau de bord', icon: BarChart3 },
-      { path: '/reporting/refashion', label: 'Refashion', icon: FileSpreadsheet },
-    ]
+  });
+
+  // Recrutement : admin, manager, rh
+  if (['admin', 'manager', 'rh'].includes(role)) {
+    sections.push({
+      title: 'Recrutement',
+      items: [
+        { path: '/recrutement', label: 'Candidatures', icon: Users },
+        { path: '/recrutement/postes', label: 'Postes', icon: Briefcase },
+      ]
+    });
   }
-];
+
+  // Équipe : admin, manager, rh
+  if (['admin', 'manager', 'rh'].includes(role)) {
+    sections.push({
+      title: 'Équipe',
+      items: [
+        { path: '/equipe', label: 'Salariés', icon: UserCheck },
+        { path: '/equipe/vehicules', label: 'Véhicules', icon: Truck },
+        { path: '/equipe/planning', label: 'Planning', icon: CalendarDays },
+      ]
+    });
+  }
+
+  // Collecte : admin, manager, rh + collaborateur collecte
+  if (['admin', 'manager', 'rh'].includes(role) || (role === 'collaborateur' && team === 'collecte')) {
+    sections.push({
+      title: 'Collecte',
+      items: [
+        { path: '/collecte', label: 'Collectes', icon: Package },
+        ...(role !== 'collaborateur' ? [{ path: '/collecte/tournees', label: 'Tournées', icon: Route }] : []),
+      ]
+    });
+  }
+
+  // Reporting : admin, manager, rh
+  if (['admin', 'manager', 'rh'].includes(role)) {
+    sections.push({
+      title: 'Reporting',
+      items: [
+        { path: '/reporting', label: 'Tableau de bord', icon: BarChart3 },
+        { path: '/reporting/refashion', label: 'Refashion', icon: FileSpreadsheet },
+      ]
+    });
+  }
+
+  // Mon profil : collaborateurs
+  if (role === 'collaborateur') {
+    sections.push({
+      title: 'Mon espace',
+      items: [
+        { path: '/mon-profil', label: 'Mon profil', icon: User },
+        { path: '/mon-planning', label: 'Mon planning', icon: CalendarDays },
+      ]
+    });
+  }
+
+  // Administration : admin uniquement
+  if (role === 'admin') {
+    sections.push({
+      title: 'Administration',
+      items: [
+        { path: '/admin/utilisateurs', label: 'Utilisateurs', icon: ShieldCheck },
+        { path: '/admin/parametres', label: 'Paramètres', icon: Settings },
+      ]
+    });
+  }
+
+  // RH : admin + rh
+  if (['admin', 'rh'].includes(role)) {
+    // Pour le moment juste un accès rapide aux utilisateurs
+    if (role === 'rh') {
+      sections.push({
+        title: 'Ressources Humaines',
+        items: [
+          { path: '/admin/utilisateurs', label: 'Profils', icon: ShieldCheck },
+        ]
+      });
+    }
+  }
+
+  return sections;
+}
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const navSections = getNavSections(user?.role, user?.team);
 
   return (
     <div className="min-h-screen flex bg-soltex-gray">
@@ -70,28 +148,26 @@ export default function Layout() {
       `}>
         <div className="flex items-center justify-between p-4 border-b">
           <Link to="/" className="flex items-center gap-3">
-            <img src="/logo.png" alt="SolTex" className="h-10" />
+            <img src="/logo.png" alt="Solidarité Textiles" className="h-10 w-10 object-contain" onError={(e) => { e.target.style.display = 'none'; }} />
             <div>
               <h1 className="text-lg font-bold text-soltex-green">Solidata</h1>
-              <p className="text-xs text-gray-400">v2.0</p>
+              <p className="text-xs text-gray-400">v2.1</p>
             </div>
           </Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-gray-500"
-          >
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-500">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <nav className="p-3 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+        <nav className="p-3 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 150px)' }}>
           {navSections.map(section => (
             <div key={section.title}>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-1">{section.title}</p>
               <div className="space-y-0.5">
                 {section.items.map(item => {
                   const Icon = item.icon;
-                  const isActive = location.pathname === item.path;
+                  const isActive = location.pathname === item.path ||
+                    (item.path !== '/' && location.pathname.startsWith(item.path));
                   return (
                     <Link
                       key={item.path}
@@ -115,17 +191,18 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white">
           <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <p className="font-medium text-gray-700">{user?.firstName} {user?.lastName}</p>
-              <p className="text-gray-400 text-xs">{user?.role}</p>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: user?.avatarColor || '#7AB51D' }}>
+                {user?.firstName?.[0]}{user?.lastName?.[0]}
+              </div>
+              <div className="text-sm leading-tight">
+                <p className="font-medium text-gray-700">{user?.firstName} {user?.lastName}</p>
+                <p className="text-gray-400 text-xs">{ROLE_LABELS[user?.role] || user?.role}{user?.team ? ` — ${TEAM_LABELS[user?.team] || user?.team}` : ''}</p>
+              </div>
             </div>
-            <button
-              onClick={logout}
-              className="text-gray-400 hover:text-red-500 transition-colors"
-              title="Déconnexion"
-            >
+            <button onClick={logout} className="text-gray-400 hover:text-red-500 transition-colors" title="Déconnexion">
               <LogOut className="w-5 h-5" />
             </button>
           </div>
@@ -134,10 +211,7 @@ export default function Layout() {
 
       {/* Overlay mobile */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Main content */}
@@ -146,6 +220,7 @@ export default function Layout() {
           <button onClick={() => setSidebarOpen(true)} className="text-gray-600">
             <Menu className="w-6 h-6" />
           </button>
+          <img src="/logo.png" alt="SolTex" className="h-8 w-8 object-contain" onError={(e) => { e.target.style.display = 'none'; }} />
           <h1 className="text-lg font-bold text-soltex-green">Solidata</h1>
         </header>
 

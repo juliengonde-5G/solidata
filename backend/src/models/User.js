@@ -27,8 +27,27 @@ const User = sequelize.define('User', {
     allowNull: false
   },
   role: {
-    type: DataTypes.ENUM('admin', 'manager', 'user', 'external'),
-    defaultValue: 'user'
+    type: DataTypes.ENUM('admin', 'manager', 'collaborateur', 'rh'),
+    defaultValue: 'collaborateur'
+  },
+  team: {
+    type: DataTypes.ENUM('tri', 'collecte', 'magasin_lhopital', 'magasin_st_sever', 'magasin_vernon', 'administration'),
+    allowNull: true,
+    comment: 'Équipe d\'affectation'
+  },
+  phone: {
+    type: DataTypes.STRING
+  },
+  avatarColor: {
+    type: DataTypes.STRING,
+    defaultValue: '#7AB51D'
+  },
+  lastLoginAt: {
+    type: DataTypes.DATE
+  },
+  mustChangePassword: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
   },
   active: {
     type: DataTypes.BOOLEAN,

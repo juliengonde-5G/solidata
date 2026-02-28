@@ -5,7 +5,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'solidata_jwt_secret_2026';
 
 function generateToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
+    { id: user.id, email: user.email, role: user.role, team: user.team },
     JWT_SECRET,
     { expiresIn: '24h' }
   );
@@ -40,4 +40,15 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { generateToken, authenticate, requireRole };
+// Vérifie que le manager gère bien cette équipe
+function requireTeam(...teams) {
+  return (req, res, next) => {
+    if (req.user.role === 'admin') return next();
+    if (!req.user.team || !teams.includes(req.user.team)) {
+      return res.status(403).json({ error: 'Accès non autorisé pour cette équipe' });
+    }
+    next();
+  };
+}
+
+module.exports = { generateToken, authenticate, requireRole, requireTeam };

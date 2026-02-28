@@ -28,6 +28,9 @@ router.post('/login', [
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
 
+    // Enregistrer la dernière connexion
+    await user.update({ lastLoginAt: new Date() });
+
     const token = generateToken(user);
     res.json({ token, user: user.toJSON() });
   } catch (err) {
@@ -59,8 +62,11 @@ router.put('/password', authenticate, [
     }
 
     req.user.password = newPassword;
+    req.user.mustChangePassword = false;
     await req.user.save();
-    res.json({ message: 'Mot de passe modifié avec succès' });
+
+    const token = generateToken(req.user);
+    res.json({ message: 'Mot de passe modifié avec succès', token, user: req.user.toJSON() });
   } catch (err) {
     console.error('Password change error:', err);
     res.status(500).json({ error: 'Erreur serveur' });

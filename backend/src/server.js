@@ -24,6 +24,10 @@ const collectionsRoutes = require('./routes/collection/collections');
 const reportsRoutes = require('./routes/reporting/reports');
 const refashionRoutes = require('./routes/reporting/refashion');
 
+// Routes Administration
+const adminUsersRoutes = require('./routes/admin/users');
+const adminSettingsRoutes = require('./routes/admin/settings');
+
 const app = express();
 const PORT = process.env.PORT || 5003;
 
@@ -58,13 +62,17 @@ app.use('/api/collection/collections', collectionsRoutes);
 app.use('/api/reporting/reports', reportsRoutes);
 app.use('/api/reporting/refashion', refashionRoutes);
 
+// Routes API - Administration
+app.use('/api/admin/users', adminUsersRoutes);
+app.use('/api/admin/settings', adminSettingsRoutes);
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     name: 'Solidata ERP',
     version: '2.0.0',
-    modules: ['recruitment', 'team', 'collection', 'reporting']
+    modules: ['recruitment', 'team', 'collection', 'reporting', 'admin']
   });
 });
 
@@ -87,9 +95,24 @@ async function start() {
         password: 'SolTex2026!',
         firstName: 'Admin',
         lastName: 'SolTex',
-        role: 'admin'
+        role: 'admin',
+        team: 'administration',
+        mustChangePassword: false
       });
       console.log('Compte admin créé: admin@solidarite-textiles.fr / SolTex2026!');
+    }
+
+    // Initialiser les paramètres par défaut
+    const { AppSettings } = require('./models');
+    const settingsCount = await AppSettings.count();
+    if (settingsCount === 0) {
+      const defaults = [
+        { key: 'app.name', value: 'Solidata', type: 'string', category: 'general', label: 'Nom de l\'application' },
+        { key: 'app.company', value: 'Solidarité Textiles', type: 'string', category: 'general', label: 'Nom de la structure' },
+        { key: 'teams.labels', value: JSON.stringify({"tri":"Tri","collecte":"Collecte","magasin_lhopital":"Magasin L'Hôpital","magasin_st_sever":"Magasin St Sever","magasin_vernon":"Magasin Vernon","administration":"Administration"}), type: 'json', category: 'equipes', label: 'Libellés des équipes' },
+      ];
+      await AppSettings.bulkCreate(defaults);
+      console.log('Paramètres par défaut initialisés');
     }
 
     // Démarrer l'aspiration email

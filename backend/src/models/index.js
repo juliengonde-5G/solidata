@@ -13,6 +13,7 @@ const CollectionPoint = require('./CollectionPoint');
 const Collection = require('./Collection');
 const CollectionReport = require('./CollectionReport');
 const RefashionDeclaration = require('./RefashionDeclaration');
+const AppSettings = require('./AppSettings');
 
 // === Associations Recrutement ===
 Candidate.belongsTo(JobPosition, { foreignKey: 'jobPositionId', as: 'jobPosition' });
@@ -74,5 +75,6 @@ module.exports = {
   CollectionPoint,
   Collection,
   CollectionReport,
-  RefashionDeclaration
+  RefashionDeclaration,
+  AppSettings
 };
