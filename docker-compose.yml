@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: solidata-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: solidata
+      POSTGRES_USER: solidata
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-solidata_secret_2026}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solidata"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: solidata-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: solidata
+      DB_USER: solidata
+      DB_PASSWORD: ${DB_PASSWORD:-solidata_secret_2026}
+      JWT_SECRET: ${JWT_SECRET:-solidata_jwt_secret_2026}
+      PORT: 5003
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-993}
+      MAIL_USER: ${MAIL_USER:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_TLS: ${MAIL_TLS:-true}
+    volumes:
+      - uploads:/app/uploads
+      - ./data:/app/data:ro
+    ports:
+      - "5003:5003"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://82.65.155.79:5003/api
+    container_name: solidata-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8082:80"
+
+volumes:
+  postgres_data:
+  uploads:
