@@ -82,7 +82,27 @@ async function start() {
     await sequelize.authenticate();
     console.log('Connexion à la base de données établie');
 
-    // Synchroniser les modèles (en dev: alter, en prod: rien ou migrations)
+    // Migration des enums si nécessaire (PostgreSQL ne supporte pas ALTER ENUM facilement)
+    try {
+      // Migrer l'enum role : ajouter les nouvelles valeurs
+      await sequelize.query(`ALTER TYPE "enum_users_role" ADD VALUE IF NOT EXISTS 'collaborateur'`).catch(() => {});
+      await sequelize.query(`ALTER TYPE "enum_users_role" ADD VALUE IF NOT EXISTS 'rh'`).catch(() => {});
+      // Migrer l'enum team si elle n'existe pas encore
+      await sequelize.query(`
+        DO $$ BEGIN
+          CREATE TYPE "enum_users_team" AS ENUM('tri', 'collecte', 'magasin_lhopital', 'magasin_st_sever', 'magasin_vernon', 'administration');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+      `).catch(() => {});
+      // Migrer les anciens rôles
+      await sequelize.query(`UPDATE users SET role = 'collaborateur' WHERE role = 'user'`).catch(() => {});
+      await sequelize.query(`UPDATE users SET role = 'collaborateur' WHERE role = 'external'`).catch(() => {});
+      console.log('Migration des enums terminée');
+    } catch (err) {
+      console.log('Migration enums (ignoré):', err.message);
+    }
+
+    // Synchroniser les modèles
     await sequelize.sync({ alter: true });
     console.log('Modèles synchronisés');
 
