@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 COPY . .
+ENV INLINE_RUNTIME_CHUNK=false
 RUN npm run build
 
 # Production
