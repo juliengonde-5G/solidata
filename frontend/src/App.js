@@ -59,9 +59,9 @@ function KanbanBoard() {
 
   const columns = [
     { key: "received", label: "Candidature reçue", color: T.primary },
-    { key: "preselected", label: "Qualifiée", color: T.warning },
+    { key: "rejected", label: "Rejetée", color: T.danger },
+    { key: "qualified", label: "Qualifiée", color: T.warning },
     { key: "interview", label: "Entretien confirmé", color: "#3498db" },
-    { key: "test", label: "Test", color: "#9b59b6" },
     { key: "hired", label: "Recruté", color: T.success },
   ];
 
