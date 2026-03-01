@@ -141,7 +141,19 @@ async function start() {
     }
 
     // Synchroniser les modèles
-    await sequelize.sync({ alter: true });
+    // D'abord créer les tables manquantes (safe)
+    await sequelize.sync();
+    console.log('Tables créées/vérifiées');
+
+    // Puis tenter alter sur chaque modèle individuellement
+    const models = sequelize.models;
+    for (const modelName of Object.keys(models)) {
+      try {
+        await models[modelName].sync({ alter: true });
+      } catch (syncErr) {
+        console.warn(`sync alter ${modelName} ignoré:`, syncErr.message);
+      }
+    }
     console.log('Modèles synchronisés');
 
     // Créer le compte admin par défaut s'il n'existe pas
