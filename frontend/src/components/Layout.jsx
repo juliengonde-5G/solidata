@@ -39,7 +39,8 @@ const ROLE_LABELS = {
   admin: 'Administrateur',
   manager: 'Manager',
   collaborateur: 'Collaborateur',
-  rh: 'Ressources Humaines'
+  rh: 'Ressources Humaines',
+  autorite: 'Autorité'
 };
 
 // Navigation complète — filtrée selon le rôle
@@ -105,6 +106,17 @@ function getNavSections(role, team) {
       items: [
         { path: '/reporting', label: 'Tableau de bord', icon: BarChart3 },
         { path: '/reporting/refashion', label: 'Refashion', icon: FileSpreadsheet },
+        ...(role === 'admin' ? [{ path: '/rapport-autorite', label: 'Rapport Autorité', icon: FileSpreadsheet }] : []),
+      ]
+    });
+  }
+
+  // Autorité administrative : uniquement le rapport
+  if (role === 'autorite') {
+    sections.push({
+      title: 'Rapport',
+      items: [
+        { path: '/rapport-autorite', label: 'Rapport', icon: BarChart3 },
       ]
     });
   }

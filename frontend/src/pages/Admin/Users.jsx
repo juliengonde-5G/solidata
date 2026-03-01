@@ -7,6 +7,7 @@ const ROLES = [
   { value: 'manager', label: 'Manager', color: 'bg-blue-100 text-blue-700', icon: '👔' },
   { value: 'collaborateur', label: 'Collaborateur', color: 'bg-green-100 text-green-700', icon: '👤' },
   { value: 'rh', label: 'Ressources Humaines', color: 'bg-purple-100 text-purple-700', icon: '📋' },
+  { value: 'autorite', label: 'Autorité', color: 'bg-amber-100 text-amber-700', icon: '🏛' },
 ];
 
 const TEAMS = [

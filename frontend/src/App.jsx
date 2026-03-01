@@ -28,6 +28,7 @@ import LiveDashboard from './pages/Collection/LiveDashboard';
 import MobileCollecte from './pages/Collection/MobileCollecte';
 import ReportingDashboard from './pages/Reporting/Dashboard';
 import Refashion from './pages/Reporting/Refashion';
+import RapportAutorite from './pages/Reporting/RapportAutorite';
 import AdminUsers from './pages/Admin/Users';
 import AdminSettings from './pages/Admin/Settings';
 
@@ -60,6 +61,9 @@ function AdaptiveDashboard() {
   const { user } = useAuth();
   if (user?.role === 'collaborateur') {
     return <CollaborateurHome />;
+  }
+  if (user?.role === 'autorite') {
+    return <Navigate to="/rapport-autorite" />;
   }
   return <Dashboard />;
 }
@@ -106,10 +110,14 @@ export default function App() {
           <Route path="mobile" element={<MobileCollecte />} />
         </Route>
 
+        {/* Rapport Autorité (autorite + admin) */}
+        <Route path="rapport-autorite" element={<RoleRoute roles={['autorite', 'admin']}><RapportAutorite /></RoleRoute>} />
+
         {/* Reporting (admin, manager, rh) */}
         <Route path="reporting">
           <Route index element={<RoleRoute roles={['admin', 'manager', 'rh']}><ReportingDashboard /></RoleRoute>} />
           <Route path="refashion" element={<RoleRoute roles={['admin', 'manager', 'rh']}><Refashion /></RoleRoute>} />
+          <Route path="autorite" element={<RoleRoute roles={['autorite', 'admin']}><RapportAutorite /></RoleRoute>} />
         </Route>
 
         {/* Administration (admin + rh pour certaines pages) */}

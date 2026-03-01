@@ -38,6 +38,7 @@ const importRoutes = require('./routes/collection/import');
 // Routes Reporting
 const reportsRoutes = require('./routes/reporting/reports');
 const refashionRoutes = require('./routes/reporting/refashion');
+const autoriteRoutes = require('./routes/reporting/autorite');
 
 // Routes Administration
 const adminUsersRoutes = require('./routes/admin/users');
@@ -83,6 +84,7 @@ app.use('/api/collection/import', importRoutes);
 // Routes API - Reporting
 app.use('/api/reporting/reports', reportsRoutes);
 app.use('/api/reporting/refashion', refashionRoutes);
+app.use('/api/reporting/autorite', autoriteRoutes);
 
 // Routes API - Administration
 app.use('/api/admin/users', adminUsersRoutes);
@@ -106,9 +108,16 @@ async function start() {
 
     // === Migration des enums et statuts ===
     try {
-      // Migrer l'enum role : ajouter les nouvelles valeurs
-      await sequelize.query(`ALTER TYPE "enum_users_role" ADD VALUE IF NOT EXISTS 'collaborateur'`).catch(() => {});
-      await sequelize.query(`ALTER TYPE "enum_users_role" ADD VALUE IF NOT EXISTS 'rh'`).catch(() => {});
+      // === Migration User.role: ENUM → VARCHAR (pour supporter 'autorite' et futurs rôles) ===
+      const [roleCol] = await sequelize.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'role'
+      `).catch(() => [[]]);
+      if (roleCol && roleCol.length > 0 && roleCol[0].data_type === 'USER-DEFINED') {
+        console.log('Migration User.role: ENUM → VARCHAR...');
+        await sequelize.query(`ALTER TABLE users ALTER COLUMN "role" TYPE VARCHAR(50) USING "role"::text`).catch(() => {});
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_users_role"`).catch(() => {});
+      }
       // Migrer l'enum team si elle n'existe pas encore
       await sequelize.query(`
         DO $$ BEGIN
