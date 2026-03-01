@@ -167,7 +167,7 @@ export default function Layout() {
                 {section.items.map(item => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path ||
-                    (item.path !== '/' && location.pathname.startsWith(item.path));
+                    (item.path !== '/' && location.pathname.startsWith(item.path + '/'));
                   return (
                     <Link
                       key={item.path}
