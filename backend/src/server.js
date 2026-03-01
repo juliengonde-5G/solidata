@@ -30,6 +30,10 @@ const vakRoutes = require('./routes/team/vak');
 const collectionRoutesRoutes = require('./routes/collection/routes');
 const collectionPointsRoutes = require('./routes/collection/points');
 const collectionsRoutes = require('./routes/collection/collections');
+const dailyRoutesRoutes = require('./routes/collection/daily-routes');
+const gpsRoutes = require('./routes/collection/gps');
+const planningCollecteRoutes = require('./routes/collection/planning');
+const importRoutes = require('./routes/collection/import');
 
 // Routes Reporting
 const reportsRoutes = require('./routes/reporting/reports');
@@ -71,6 +75,10 @@ app.use('/api/team/vak', vakRoutes);
 app.use('/api/collection/routes', collectionRoutesRoutes);
 app.use('/api/collection/points', collectionPointsRoutes);
 app.use('/api/collection/collections', collectionsRoutes);
+app.use('/api/collection/daily-routes', dailyRoutesRoutes);
+app.use('/api/collection/gps', gpsRoutes);
+app.use('/api/collection/planning', planningCollecteRoutes);
+app.use('/api/collection/import', importRoutes);
 
 // Routes API - Reporting
 app.use('/api/reporting/reports', reportsRoutes);
@@ -130,8 +138,6 @@ async function start() {
       await sequelize.query(`UPDATE candidates SET status = 'recrute' WHERE status = 'recrutement_valide'`).catch(() => {});
 
       // === Fix contraintes UNIQUE inline qui bloquent ALTER COLUMN TYPE ===
-      // PostgreSQL ne supporte pas ALTER COLUMN TYPE ... UNIQUE
-      // Supprimer les anciennes contraintes avant sync({ alter: true })
       const uniqueConstraints = [
         { table: 'collection_points', column: 'qrCode' },
         { table: 'vehicles', column: 'licensePlate' },
@@ -147,6 +153,38 @@ async function start() {
         `).catch(() => {});
         await sequelize.query(`DROP INDEX IF EXISTS "${table}_${column}_key"`).catch(() => {});
         await sequelize.query(`DROP INDEX IF EXISTS "${table}_${column}"`).catch(() => {});
+      }
+
+      // === Migration CollectionPoint: routeId → nullable ===
+      await sequelize.query(`
+        DO $$ BEGIN
+          ALTER TABLE collection_points ALTER COLUMN "routeId" DROP NOT NULL;
+        EXCEPTION WHEN undefined_table OR undefined_column THEN NULL;
+        END $$;
+      `).catch(() => {});
+
+      // === Migration Route.dayOfWeek: ENUM → VARCHAR ===
+      const [dowCol] = await sequelize.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'routes' AND column_name = 'dayOfWeek'
+      `).catch(() => [[]]);
+      if (dowCol && dowCol.length > 0 && dowCol[0].data_type === 'USER-DEFINED') {
+        console.log('Migration Route.dayOfWeek: ENUM → VARCHAR...');
+        await sequelize.query(`ALTER TABLE routes ALTER COLUMN "dayOfWeek" TYPE VARCHAR(50) USING "dayOfWeek"::text`).catch(() => {});
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_routes_dayOfWeek"`).catch(() => {});
+      }
+
+      // === Migration Vehicle enums: ENUM → VARCHAR ===
+      const [vtCol] = await sequelize.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'vehicles' AND column_name = 'type'
+      `).catch(() => [[]]);
+      if (vtCol && vtCol.length > 0 && vtCol[0].data_type === 'USER-DEFINED') {
+        console.log('Migration Vehicle enums → VARCHAR...');
+        await sequelize.query(`ALTER TABLE vehicles ALTER COLUMN "type" TYPE VARCHAR(50) USING "type"::text`).catch(() => {});
+        await sequelize.query(`ALTER TABLE vehicles ALTER COLUMN "status" TYPE VARCHAR(50) USING "status"::text`).catch(() => {});
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_vehicles_type"`).catch(() => {});
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_vehicles_status"`).catch(() => {});
       }
 
       console.log('Migration des enums terminée');

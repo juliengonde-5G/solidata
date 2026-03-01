@@ -22,6 +22,9 @@ import VakModule from './pages/Team/VakModule';
 import RoutesPage from './pages/Collection/Routes';
 import RouteDetail from './pages/Collection/RouteDetail';
 import Collections from './pages/Collection/Collections';
+import MapCAV from './pages/Collection/MapCAV';
+import PlanningCollecte from './pages/Collection/PlanningCollecte';
+import LiveDashboard from './pages/Collection/LiveDashboard';
 import ReportingDashboard from './pages/Reporting/Dashboard';
 import Refashion from './pages/Reporting/Refashion';
 import AdminUsers from './pages/Admin/Users';
@@ -96,6 +99,9 @@ export default function App() {
           <Route index element={<Collections />} />
           <Route path="tournees" element={<RoleRoute roles={['admin', 'manager', 'rh']}><RoutesPage /></RoleRoute>} />
           <Route path="tournee/:id" element={<RoleRoute roles={['admin', 'manager', 'rh']}><RouteDetail /></RoleRoute>} />
+          <Route path="carte" element={<MapCAV />} />
+          <Route path="planning" element={<RoleRoute roles={['admin', 'manager', 'rh']}><PlanningCollecte /></RoleRoute>} />
+          <Route path="live" element={<LiveDashboard />} />
         </Route>
 
         {/* Reporting (admin, manager, rh) */}

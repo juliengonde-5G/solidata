@@ -7,50 +7,86 @@ const CollectionPoint = sequelize.define('CollectionPoint', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
-  routeId: {
-    type: DataTypes.UUID,
-    allowNull: false
-  },
   name: {
     type: DataTypes.STRING,
     allowNull: false,
-    comment: 'Nom du point (mairie, déchetterie, CAV...)'
+    comment: 'Dénomination interne (ex: ROUEN - 27 rue Saint-Sever)'
   },
   type: {
     type: DataTypes.ENUM('cav', 'decheterie', 'partenaire', 'evenement', 'boite_a_dons'),
-    allowNull: false
+    allowNull: false,
+    defaultValue: 'cav'
   },
   address: {
-    type: DataTypes.STRING,
-    allowNull: false
+    type: DataTypes.STRING
+  },
+  addressComplement: {
+    type: DataTypes.STRING
   },
   city: {
-    type: DataTypes.STRING,
-    allowNull: false
+    type: DataTypes.STRING
   },
   postalCode: {
     type: DataTypes.STRING(5)
   },
   latitude: {
-    type: DataTypes.FLOAT
+    type: DataTypes.DOUBLE
   },
   longitude: {
-    type: DataTypes.FLOAT
+    type: DataTypes.DOUBLE
+  },
+  nbCav: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1,
+    comment: 'Nombre de conteneurs sur le point'
+  },
+  frequence: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1,
+    comment: 'Fréquence de passage hebdomadaire'
+  },
+  avgFillRate: {
+    type: DataTypes.FLOAT,
+    comment: 'Taux de remplissage moyen (%)'
+  },
+  lastCollectionDate: {
+    type: DataTypes.DATEONLY,
+    comment: 'Dernière date de collecte'
+  },
+  totalCollections2025: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    comment: 'Nombre total de collectes en 2025'
   },
   qrCode: {
     type: DataTypes.STRING,
     comment: 'Identifiant QR code unique pour scan'
+  },
+  ecoTlcRef: {
+    type: DataTypes.STRING,
+    comment: 'Référence Eco TLC'
+  },
+  owner: {
+    type: DataTypes.STRING,
+    comment: 'Entité détentrice'
+  },
+  communaute: {
+    type: DataTypes.STRING,
+    comment: 'Communauté de communes'
+  },
+  surface: {
+    type: DataTypes.STRING,
+    comment: 'Type de surface (Publique, Parking CC, Privé...)'
+  },
+  suspensionMotif: {
+    type: DataTypes.STRING,
+    comment: 'Motif de suspension (Travaux, Dégradation...)'
   },
   contactName: {
     type: DataTypes.STRING
   },
   contactPhone: {
     type: DataTypes.STRING
-  },
-  sortOrder: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    comment: 'Ordre de passage dans la tournée'
   },
   active: {
     type: DataTypes.BOOLEAN,

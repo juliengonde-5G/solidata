@@ -9,16 +9,16 @@ const Route = sequelize.define('Route', {
   },
   name: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: false,
+    comment: 'Nom de la tournée (ex: Rouen Rive Droite 1)'
   },
   sector: {
     type: DataTypes.STRING,
-    allowNull: false,
-    comment: 'Secteur géographique (ex: Bordeaux Nord, CUB Sud...)'
+    comment: 'Secteur géographique'
   },
   dayOfWeek: {
-    type: DataTypes.ENUM('lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'),
-    allowNull: false
+    type: DataTypes.STRING,
+    comment: 'Jour standard (lundi, mardi...) ou null si flexible'
   },
   estimatedDuration: {
     type: DataTypes.INTEGER,
@@ -29,7 +29,7 @@ const Route = sequelize.define('Route', {
     comment: 'Distance estimée en km'
   },
   vehicleType: {
-    type: DataTypes.ENUM('camion_20m3', 'camion_12m3', 'utilitaire', 'voiture'),
+    type: DataTypes.STRING,
     defaultValue: 'camion_20m3'
   },
   active: {

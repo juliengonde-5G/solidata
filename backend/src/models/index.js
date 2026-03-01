@@ -9,7 +9,12 @@ const Skill = require('./Skill');
 const Vehicle = require('./Vehicle');
 const Planning = require('./Planning');
 const Route = require('./Route');
+const RouteTemplatePoint = require('./RouteTemplatePoint');
 const CollectionPoint = require('./CollectionPoint');
+const DailyRoute = require('./DailyRoute');
+const DailyRoutePoint = require('./DailyRoutePoint');
+const GPSTrack = require('./GPSTrack');
+const WeightRecord = require('./WeightRecord');
 const Collection = require('./Collection');
 const CollectionReport = require('./CollectionReport');
 const RefashionDeclaration = require('./RefashionDeclaration');
@@ -70,10 +75,46 @@ VakAssignment.belongsTo(VakWorkStation, { foreignKey: 'vakWorkStationId', as: 'v
 Employee.hasMany(VakAssignment, { foreignKey: 'employeeId', as: 'vakAssignments' });
 VakAssignment.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });
 
-// === Associations Collecte ===
-Route.hasMany(CollectionPoint, { foreignKey: 'routeId', as: 'points' });
-CollectionPoint.belongsTo(Route, { foreignKey: 'routeId', as: 'route' });
+// === Associations Collecte — Route Templates ===
+Route.hasMany(RouteTemplatePoint, { foreignKey: 'routeId', as: 'templatePoints' });
+RouteTemplatePoint.belongsTo(Route, { foreignKey: 'routeId', as: 'route' });
 
+CollectionPoint.hasMany(RouteTemplatePoint, { foreignKey: 'collectionPointId', as: 'routeLinks' });
+RouteTemplatePoint.belongsTo(CollectionPoint, { foreignKey: 'collectionPointId', as: 'collectionPoint' });
+
+// Many-to-many through RouteTemplatePoint
+Route.belongsToMany(CollectionPoint, { through: RouteTemplatePoint, foreignKey: 'routeId', otherKey: 'collectionPointId', as: 'points' });
+CollectionPoint.belongsToMany(Route, { through: RouteTemplatePoint, foreignKey: 'collectionPointId', otherKey: 'routeId', as: 'routes' });
+
+// === Associations Collecte — Daily Routes ===
+Route.hasMany(DailyRoute, { foreignKey: 'templateRouteId', as: 'dailyRoutes' });
+DailyRoute.belongsTo(Route, { foreignKey: 'templateRouteId', as: 'templateRoute' });
+
+Vehicle.hasMany(DailyRoute, { foreignKey: 'vehicleId', as: 'dailyRoutes' });
+DailyRoute.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
+
+Employee.hasMany(DailyRoute, { foreignKey: 'driverId', as: 'driverRoutes' });
+DailyRoute.belongsTo(Employee, { foreignKey: 'driverId', as: 'driver' });
+
+Employee.hasMany(DailyRoute, { foreignKey: 'followerId', as: 'followerRoutes' });
+DailyRoute.belongsTo(Employee, { foreignKey: 'followerId', as: 'follower' });
+
+// Daily Route Points (points d'une tournée journalière)
+DailyRoute.hasMany(DailyRoutePoint, { foreignKey: 'dailyRouteId', as: 'routePoints' });
+DailyRoutePoint.belongsTo(DailyRoute, { foreignKey: 'dailyRouteId', as: 'dailyRoute' });
+
+CollectionPoint.hasMany(DailyRoutePoint, { foreignKey: 'collectionPointId', as: 'dailyVisits' });
+DailyRoutePoint.belongsTo(CollectionPoint, { foreignKey: 'collectionPointId', as: 'collectionPoint' });
+
+// GPS Tracking
+DailyRoute.hasMany(GPSTrack, { foreignKey: 'dailyRouteId', as: 'gpsTrack' });
+GPSTrack.belongsTo(DailyRoute, { foreignKey: 'dailyRouteId', as: 'dailyRoute' });
+
+// Weight Records
+DailyRoute.hasMany(WeightRecord, { foreignKey: 'dailyRouteId', as: 'weightRecords' });
+WeightRecord.belongsTo(DailyRoute, { foreignKey: 'dailyRouteId', as: 'dailyRoute' });
+
+// === Associations Collecte (legacy — Collection records) ===
 Route.hasMany(Collection, { foreignKey: 'routeId', as: 'collections' });
 Collection.belongsTo(Route, { foreignKey: 'routeId', as: 'route' });
 
@@ -102,7 +143,12 @@ module.exports = {
   Vehicle,
   Planning,
   Route,
+  RouteTemplatePoint,
   CollectionPoint,
+  DailyRoute,
+  DailyRoutePoint,
+  GPSTrack,
+  WeightRecord,
   Collection,
   CollectionReport,
   RefashionDeclaration,

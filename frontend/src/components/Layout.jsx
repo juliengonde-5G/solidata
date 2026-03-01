@@ -19,7 +19,10 @@ import {
   User,
   ClipboardList,
   Shield,
-  PartyPopper
+  PartyPopper,
+  Map,
+  Radio,
+  Compass
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -83,7 +86,12 @@ function getNavSections(role, team) {
       title: 'Collecte',
       items: [
         { path: '/collecte', label: 'Collectes', icon: Package },
-        ...(role !== 'collaborateur' ? [{ path: '/collecte/tournees', label: 'Tournées', icon: Route }] : []),
+        ...(role !== 'collaborateur' ? [
+          { path: '/collecte/planning', label: 'Planning', icon: Compass },
+          { path: '/collecte/tournees', label: 'Tournées std', icon: Route },
+        ] : []),
+        { path: '/collecte/carte', label: 'Carte CAV', icon: Map },
+        { path: '/collecte/live', label: 'Suivi live', icon: Radio },
       ]
     });
   }

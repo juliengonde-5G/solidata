@@ -16,15 +16,24 @@ const Vehicle = sequelize.define('Vehicle', {
     allowNull: false
   },
   type: {
-    type: DataTypes.ENUM('camion_20m3', 'camion_12m3', 'utilitaire', 'voiture'),
-    allowNull: false
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'camion_20m3'
   },
   capacity: {
     type: DataTypes.FLOAT,
     comment: 'Capacité en m3'
   },
+  chargeUtile: {
+    type: DataTypes.INTEGER,
+    comment: 'Charge utile en kg'
+  },
+  tpiWeight: {
+    type: DataTypes.INTEGER,
+    comment: 'Tare pour pesée en kg'
+  },
   status: {
-    type: DataTypes.ENUM('disponible', 'en_tournee', 'maintenance', 'hors_service'),
+    type: DataTypes.STRING,
     defaultValue: 'disponible'
   },
   lastMaintenanceDate: {
