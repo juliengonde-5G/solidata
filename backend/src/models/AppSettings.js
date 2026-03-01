@@ -9,8 +9,7 @@ const AppSettings = sequelize.define('AppSettings', {
   },
   key: {
     type: DataTypes.STRING,
-    allowNull: false,
-    unique: true
+    allowNull: false
   },
   value: {
     type: DataTypes.TEXT,
@@ -34,7 +33,10 @@ const AppSettings = sequelize.define('AppSettings', {
   }
 }, {
   tableName: 'app_settings',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { unique: true, fields: ['key'] }
+  ]
 });
 
 // Helpers pour lire/écrire facilement

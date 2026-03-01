@@ -13,8 +13,7 @@ const Vehicle = sequelize.define('Vehicle', {
   },
   licensePlate: {
     type: DataTypes.STRING,
-    allowNull: false,
-    unique: true
+    allowNull: false
   },
   type: {
     type: DataTypes.ENUM('camion_20m3', 'camion_12m3', 'utilitaire', 'voiture'),
@@ -40,7 +39,10 @@ const Vehicle = sequelize.define('Vehicle', {
   }
 }, {
   tableName: 'vehicles',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { unique: true, fields: ['licensePlate'] }
+  ]
 });
 
 module.exports = Vehicle;

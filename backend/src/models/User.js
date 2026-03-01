@@ -11,7 +11,6 @@ const User = sequelize.define('User', {
   email: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
     validate: { isEmail: true }
   },
   password: {
@@ -55,6 +54,9 @@ const User = sequelize.define('User', {
 }, {
   tableName: 'users',
   timestamps: true,
+  indexes: [
+    { unique: true, fields: ['email'] }
+  ],
   hooks: {
     beforeCreate: async (user) => {
       if (user.password) {
