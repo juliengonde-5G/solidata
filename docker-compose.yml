@@ -45,10 +45,10 @@ services:
       - "5003"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:5003/api/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
 
   frontend:
     build:

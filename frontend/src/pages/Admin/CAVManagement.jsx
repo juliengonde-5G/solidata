@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import api from '../../utils/api';
 import {
   MapPin, Plus, Edit2, Trash2, X, Search, XCircle,
-  AlertTriangle, CheckCircle, Eye, EyeOff, Filter
+  AlertTriangle, CheckCircle, Eye, EyeOff, Filter, QrCode, Printer
 } from 'lucide-react';
 
 const TYPE_LABELS = {
@@ -32,6 +33,28 @@ export default function CAVManagement() {
   const [showSuspendModal, setShowSuspendModal] = useState(null);
   const [suspensionMotif, setSuspensionMotif] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [showQrModal, setShowQrModal] = useState(null);
+  const qrPrintRef = useRef(null);
+
+  const handlePrintQR = (point) => {
+    setShowQrModal(point);
+    setTimeout(() => {
+      if (qrPrintRef.current) {
+        const printWindow = window.open('', '_blank', 'width=400,height=500');
+        printWindow.document.write(`
+          <html><head><title>QR Code - ${point.name}</title>
+          <style>body{font-family:Arial,sans-serif;text-align:center;padding:20px}
+          .name{font-size:14px;font-weight:bold;margin:10px 0}
+          .code{font-size:18px;font-family:monospace;margin:5px 0}
+          .addr{font-size:11px;color:#666}</style></head><body>
+          ${qrPrintRef.current.innerHTML}
+          <script>window.print();window.close();</script>
+          </body></html>
+        `);
+        printWindow.document.close();
+      }
+    }, 300);
+  };
 
   const fetchPoints = useCallback(async () => {
     try {
@@ -211,6 +234,7 @@ export default function CAVManagement() {
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Conteneurs</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Fréq./sem</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">GPS</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">QR Code</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Statut</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
               </tr>
@@ -238,6 +262,17 @@ export default function CAVManagement() {
                         <CheckCircle className="w-4 h-4 text-green-500 inline" />
                       ) : (
                         <XCircle className="w-4 h-4 text-gray-300 inline" />
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {point.qrCode ? (
+                        <button onClick={(e) => { e.stopPropagation(); handlePrintQR(point); }}
+                          className="inline-flex items-center gap-1 text-xs text-soltex-green hover:underline" title="Voir / Imprimer QR">
+                          <QrCode className="w-4 h-4" />
+                          <span className="font-mono text-[10px]">{point.qrCode}</span>
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-300">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -479,6 +514,30 @@ export default function CAVManagement() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQrModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowQrModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">QR Code</h2>
+              <button onClick={() => setShowQrModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div ref={qrPrintRef} className="text-center">
+              <QRCodeSVG value={showQrModal.qrCode} size={200} className="mx-auto mb-4" />
+              <p className="name font-bold text-sm">{showQrModal.name}</p>
+              <p className="code text-lg font-mono font-bold text-soltex-green">{showQrModal.qrCode}</p>
+              <p className="addr text-xs text-gray-500">{showQrModal.address}, {showQrModal.city}</p>
+            </div>
+            <button onClick={() => handlePrintQR(showQrModal)}
+              className="w-full mt-4 bg-soltex-green text-white rounded-lg py-2 flex items-center justify-center gap-2 text-sm font-medium">
+              <Printer className="w-4 h-4" /> Imprimer le QR code
+            </button>
           </div>
         </div>
       )}

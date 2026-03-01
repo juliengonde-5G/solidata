@@ -90,12 +90,15 @@ function getNavSections(role, team) {
         ...(role === 'collaborateur' ? [
           { path: '/collecte/mobile', label: 'Ma tournée', icon: Truck },
         ] : [
-          { path: '/collecte', label: 'Collectes', icon: Package },
           { path: '/collecte/planning', label: 'Planning', icon: Compass },
           { path: '/collecte/tournees', label: 'Tournées std', icon: Route },
+          { path: '/collecte/mobile', label: 'Ma tournée', icon: Truck },
         ]),
         { path: '/collecte/carte', label: 'Carte CAV', icon: Map },
         { path: '/collecte/live', label: 'Suivi live', icon: Radio },
+        ...(['admin', 'manager', 'rh'].includes(role) ? [
+          { path: '/collecte', label: 'Tonnages', icon: Package },
+        ] : []),
       ]
     });
   }

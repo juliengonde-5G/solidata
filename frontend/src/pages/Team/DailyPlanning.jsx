@@ -4,15 +4,26 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
   Calendar, AlertTriangle, CheckCircle2, Clock, ChevronLeft, ChevronRight,
-  Users, Shield, Download, Check, RefreshCw
+  Users, Shield, Download, Check, RefreshCw, UserX
 } from 'lucide-react';
 
 const GROUP_COLORS = {
   Tri: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100' },
-  Logistique: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-100' },
   Collecte: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', badge: 'bg-green-100' },
+  Logistique: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-100' },
   Boutique: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100' },
   Autre: { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', badge: 'bg-gray-100' },
+  Absences: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', badge: 'bg-red-100' },
+};
+
+const GROUP_ORDER = ['Tri', 'Collecte', 'Logistique', 'Boutique', 'Autre'];
+
+const ABSENCE_LABELS = {
+  repos: 'Repos',
+  vacances: 'Vacances',
+  absence: 'Absence',
+  conge: 'Congé',
+  formation: 'Formation',
 };
 
 export default function DailyPlanning() {
@@ -43,6 +54,16 @@ export default function DailyPlanning() {
   }, [date]);
 
   useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
+
+  const handleSaturdayRepos = async () => {
+    try {
+      const res = await api.put('/team/assignments/saturday-repos', { date });
+      alert(res.data.message);
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erreur');
+    }
+  };
 
   const handleAssign = async (workStationId, employeeId) => {
     try {
@@ -165,12 +186,21 @@ export default function DailyPlanning() {
   const dateObj = new Date(date);
   const dayLabel = dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+  const isSaturday = dateObj.getDay() === 6;
 
-  // Grouper les postes par catégorie
+  // Grouper les postes par catégorie, trié selon GROUP_ORDER
   const groups = {};
   workStations.forEach(ws => {
     if (!groups[ws.group]) groups[ws.group] = [];
     groups[ws.group].push(ws);
+  });
+
+  const sortedGroups = GROUP_ORDER
+    .filter(g => groups[g])
+    .map(g => [g, groups[g]]);
+  // Ajouter les groupes non listés dans GROUP_ORDER
+  Object.keys(groups).forEach(g => {
+    if (!GROUP_ORDER.includes(g)) sortedGroups.push([g, groups[g]]);
   });
 
   // Map assignment par workStationId
@@ -179,6 +209,11 @@ export default function DailyPlanning() {
 
   // Employees déjà affectés
   const assignedIds = new Set(assignments.map(a => a.employeeId));
+
+  // Absences: employés qui ne travaillent pas ce jour
+  const absentEmployees = availableEmployees
+    .filter(e => e.dayStatus !== 'travaille')
+    .sort((a, b) => a.lastName.localeCompare(b.lastName));
 
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Chargement...</div>;
@@ -190,6 +225,11 @@ export default function DailyPlanning() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <h1 className="text-2xl font-bold text-soltex-gray-dark">Affectations du jour</h1>
         <div className="flex items-center gap-2">
+          {isSaturday && (
+            <button onClick={handleSaturdayRepos} className="border border-orange-300 hover:bg-orange-50 text-orange-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors">
+              <UserX className="w-4 h-4" /> Repos samedi
+            </button>
+          )}
           <button onClick={handleExportPDF} className="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors">
             <Download className="w-4 h-4" /> PDF semaine
           </button>
@@ -258,13 +298,15 @@ export default function DailyPlanning() {
         </div>
       )}
 
-      {/* Grille par groupe */}
-      {Object.entries(groups).map(([groupName, stations]) => {
+      {/* Grille par groupe (ordre: Tri, Collecte, Logistique, Boutique, Autre) */}
+      {sortedGroups.map(([groupName, stations]) => {
         const colors = GROUP_COLORS[groupName] || GROUP_COLORS.Autre;
+        const isCollecte = groupName === 'Collecte';
         return (
           <div key={groupName} className="mb-6">
-            <div className={`${colors.bg} ${colors.border} border rounded-t-xl px-4 py-3`}>
+            <div className={`${colors.bg} ${colors.border} border rounded-t-xl px-4 py-3 flex items-center justify-between`}>
               <h3 className={`font-bold text-sm uppercase tracking-wider ${colors.text}`}>{groupName}</h3>
+              <span className={`text-xs ${colors.text} opacity-60`}>{stations.length} postes</span>
             </div>
             <div className="bg-white border border-t-0 rounded-b-xl shadow-sm divide-y">
               {stations.map(ws => {
@@ -297,17 +339,19 @@ export default function DailyPlanning() {
                         <option value="">-- Libre --</option>
                         {availableEmployees
                           .filter(e => {
-                            // Montrer l'employé déjà affecté + ceux disponibles
                             if (assignment?.employeeId === e.id) return true;
                             if (e.assignedToWorkStationId && e.assignedToWorkStationId !== ws.id) return false;
                             if (e.dayStatus !== 'travaille') return false;
                             if (ws.reqCaces && !e.caces) return false;
                             if (ws.reqPermis && !e.drivingLicense) return false;
+                            // Collecte: seuls les employés avec permis B (chauffeurs)
+                            if (isCollecte && !e.drivingLicense) return false;
                             return true;
                           })
                           .map(e => (
                             <option key={e.id} value={e.id}>
                               {e.lastName} {e.firstName} ({e.contractHours || '35h'})
+                              {isCollecte && e.drivingLicense ? ' 🚗' : ''}
                             </option>
                           ))
                         }
@@ -333,6 +377,34 @@ export default function DailyPlanning() {
           </div>
         );
       })}
+
+      {/* Section Absences */}
+      {absentEmployees.length > 0 && (
+        <div className="mb-6">
+          <div className={`${GROUP_COLORS.Absences.bg} ${GROUP_COLORS.Absences.border} border rounded-t-xl px-4 py-3 flex items-center justify-between`}>
+            <h3 className={`font-bold text-sm uppercase tracking-wider ${GROUP_COLORS.Absences.text}`}>
+              <UserX className="w-4 h-4 inline mr-2" />Absences
+            </h3>
+            <span className="text-xs text-red-600 opacity-60">{absentEmployees.length} personnes</span>
+          </div>
+          <div className="bg-white border border-t-0 rounded-b-xl shadow-sm divide-y">
+            {absentEmployees.map(e => (
+              <div key={e.id} className="px-4 py-2.5 flex items-center justify-between">
+                <span className="text-sm text-gray-700">{e.lastName} {e.firstName}</span>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                  e.dayStatus === 'vacances' ? 'bg-blue-100 text-blue-700' :
+                  e.dayStatus === 'formation' ? 'bg-purple-100 text-purple-700' :
+                  e.dayStatus === 'conge' ? 'bg-indigo-100 text-indigo-700' :
+                  e.dayStatus === 'absence' ? 'bg-orange-100 text-orange-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {ABSENCE_LABELS[e.dayStatus] || e.dayStatus}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {workStations.length === 0 && (
         <div className="text-center py-12 bg-white rounded-xl shadow-sm">

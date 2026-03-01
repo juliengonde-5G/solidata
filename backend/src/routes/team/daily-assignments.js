@@ -147,6 +147,10 @@ router.put('/assign', requireRole('admin', 'manager', 'rh'), async (req, res) =>
     if (workStation.reqPermis && !employee.drivingLicense) {
       return res.status(400).json({ error: 'Permis B requis pour ce poste' });
     }
+    // Collecte: permis B obligatoire (chauffeurs uniquement)
+    if (workStation.group === 'Collecte' && !employee.drivingLicense) {
+      return res.status(400).json({ error: 'Permis B obligatoire pour les postes Collecte' });
+    }
 
     // Upsert
     const [assignment] = await DailyAssignment.upsert({
@@ -282,6 +286,60 @@ router.get('/employee-calendar/:employeeId', async (req, res) => {
     });
 
     res.json({ statuses, assignments, vakAssignments });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /saturday-repos — Mettre en repos toutes les personnes sans affectation boutique le samedi (hors VAK)
+router.put('/saturday-repos', requireRole('admin', 'manager', 'rh'), async (req, res) => {
+  try {
+    const { date } = req.body;
+    if (!date) return res.status(400).json({ error: 'Date requise' });
+
+    const dateObj = new Date(date);
+    if (dateObj.getDay() !== 6) {
+      return res.status(400).json({ error: 'Cette fonction ne s\'applique qu\'au samedi' });
+    }
+
+    // Tous les employés actifs
+    const employees = await Employee.findAll({ where: { active: true } });
+
+    // Affectations existantes ce jour (postes boutique)
+    const boutiqueAssignments = await DailyAssignment.findAll({
+      where: { date },
+      include: [{ model: WorkStation, as: 'workStation', where: { group: 'Boutique' } }]
+    });
+    const boutiqueEmployeeIds = new Set(boutiqueAssignments.map(a => a.employeeId));
+
+    // Employés affectés VAK ce jour
+    const { VakAssignment, VakEvent } = require('../../models');
+    const vakAssignments = await VakAssignment.findAll({
+      where: { date },
+      include: [{ model: VakEvent, as: 'vakEvent' }]
+    });
+    const vakEmployeeIds = new Set(vakAssignments.map(a => a.employeeId));
+
+    // Statuts déjà définis
+    const existingStatuses = await EmployeeDayStatus.findAll({ where: { date } });
+    const statusMap = {};
+    existingStatuses.forEach(s => { statusMap[s.employeeId] = s.status; });
+
+    let count = 0;
+    for (const emp of employees) {
+      // Ne pas toucher si déjà en boutique ou VAK
+      if (boutiqueEmployeeIds.has(emp.id)) continue;
+      if (vakEmployeeIds.has(emp.id)) continue;
+      // Ne pas écraser un statut existant (vacances, congé, etc.)
+      if (statusMap[emp.id] && statusMap[emp.id] !== 'travaille') continue;
+
+      await EmployeeDayStatus.upsert({
+        employeeId: emp.id, date, status: 'repos', notes: 'Repos samedi automatique'
+      }, { conflictFields: ['employeeId', 'date'] });
+      count++;
+    }
+
+    res.json({ message: `${count} employés mis en repos pour le samedi`, count });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

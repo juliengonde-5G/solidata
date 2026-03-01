@@ -1,43 +1,41 @@
 import { useEffect, useState } from 'react';
 import api from '../../utils/api';
-import { Plus, Weight, Package, Calendar, Truck, MapPin } from 'lucide-react';
-
-const STATUS_CONFIG = {
-  planifiee: { label: 'Planifiée', color: 'bg-gray-100 text-gray-700' },
-  en_cours: { label: 'En cours', color: 'bg-blue-100 text-blue-700' },
-  terminee: { label: 'Terminée', color: 'bg-green-100 text-green-700' },
-  annulee: { label: 'Annulée', color: 'bg-red-100 text-red-700' }
-};
+import { Plus, Weight, Package, Calendar, Truck, MapPin, Edit2, X } from 'lucide-react';
 
 export default function Collections() {
+  const [weightRecords, setWeightRecords] = useState([]);
   const [collections, setCollections] = useState([]);
   const [stats, setStats] = useState(null);
   const [routes, setRoutes] = useState([]);
-  const [points, setPoints] = useState([]);
-  const [allPoints, setAllPoints] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState('tonnages'); // tonnages, regularisations, historique
+  const [filterRoute, setFilterRoute] = useState('');
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
     const end = now.toISOString().slice(0, 10);
     return { startDate: start, endDate: end };
   });
-  const [form, setForm] = useState({
-    routeId: '', collectionPointId: '', collectionDate: new Date().toISOString().slice(0, 10),
-    weightKg: '', bagsCount: '', status: 'terminee', notes: ''
+
+  // Regularisation form
+  const [showRegForm, setShowRegForm] = useState(false);
+  const [regForm, setRegForm] = useState({
+    categorie: '', poidsNet: '', origine: 'Collecte de CAV', notes: '',
+    weighedAt: new Date().toISOString().slice(0, 10)
   });
 
   const fetchData = async () => {
     try {
-      const [colRes, statsRes, routesRes] = await Promise.all([
+      const [wrRes, colRes, routesRes, statsRes] = await Promise.all([
+        api.get('/collection/weight-records', { params: { ...dateRange, origine: filterRoute || undefined } }),
         api.get('/collection/collections', { params: dateRange }),
-        api.get('/collection/collections/stats', { params: dateRange }),
-        api.get('/collection/routes')
+        api.get('/collection/routes'),
+        api.get('/collection/collections/stats', { params: dateRange })
       ]);
-      setCollections(colRes.data);
-      setStats(statsRes.data);
-      setRoutes(routesRes.data);
+      setWeightRecords(wrRes.data || []);
+      setCollections(colRes.data || []);
+      setRoutes(routesRes.data || []);
+      setStats(statsRes.data || null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -45,180 +43,227 @@ export default function Collections() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [dateRange.startDate, dateRange.endDate]);
+  useEffect(() => { setLoading(true); fetchData(); }, [dateRange.startDate, dateRange.endDate, filterRoute]);
 
-  const onRouteChange = async (routeId) => {
-    setForm({ ...form, routeId, collectionPointId: '' });
-    if (routeId) {
-      try {
-        const { data } = await api.get('/collection/points', { params: { routeId } });
-        setPoints(data);
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      setPoints([]);
-    }
-  };
+  // Grouper les tonnages par tournée
+  const groupedByRoute = {};
+  weightRecords.forEach(wr => {
+    const key = wr.categorie || 'Autre';
+    if (!groupedByRoute[key]) groupedByRoute[key] = { records: [], total: 0 };
+    groupedByRoute[key].records.push(wr);
+    groupedByRoute[key].total += wr.poidsNet || 0;
+  });
 
-  // Charger tous les points quand le formulaire s'ouvre (pour saisie sans tournée)
-  useEffect(() => {
-    if (showForm && allPoints.length === 0) {
-      api.get('/collection/points').then(r => setAllPoints(r.data)).catch(() => {});
-    }
-  }, [showForm]);
+  const totalWeight = weightRecords.reduce((s, r) => s + (r.poidsNet || 0), 0);
 
-  const handleSubmit = async (e) => {
+  const handleRegSubmit = async (e) => {
     e.preventDefault();
     try {
-      const payload = {
-        collectionPointId: form.collectionPointId,
-        collectionDate: form.collectionDate,
-        weightKg: parseFloat(form.weightKg) || 0,
-        bagsCount: parseInt(form.bagsCount) || 0,
-        status: form.status,
-        notes: form.notes
-      };
-      if (form.routeId) payload.routeId = form.routeId;
-      await api.post('/collection/collections', payload);
-      setShowForm(false);
-      setForm({ routeId: '', collectionPointId: '', collectionDate: new Date().toISOString().slice(0, 10), weightKg: '', bagsCount: '', status: 'terminee', notes: '' });
+      await api.post('/collection/weight-records', {
+        ...regForm,
+        poidsNet: parseInt(regForm.poidsNet),
+        weighedAt: regForm.weighedAt,
+        mois: new Date(regForm.weighedAt).getMonth() + 1,
+        annee: new Date(regForm.weighedAt).getFullYear()
+      });
+      setShowRegForm(false);
+      setRegForm({ categorie: '', poidsNet: '', origine: 'Collecte de CAV', notes: '', weighedAt: new Date().toISOString().slice(0, 10) });
       fetchData();
     } catch (err) {
       alert(err.response?.data?.error || 'Erreur');
     }
   };
 
-  // Points à afficher dans le sélecteur : ceux de la tournée ou tous
-  const displayPoints = form.routeId ? points : allPoints;
-
   if (loading) return <div className="text-center py-12 text-gray-500">Chargement...</div>;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-soltex-gray-dark">Collectes</h1>
-        <button onClick={() => setShowForm(!showForm)} className="bg-soltex-green text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-soltex-green/90">
-          <Plus className="w-4 h-4" /> Saisir une collecte
+        <h1 className="text-2xl font-bold text-soltex-gray-dark">Tonnages & Historique</h1>
+        <button onClick={() => setShowRegForm(true)} className="bg-soltex-green text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-soltex-green/90">
+          <Plus className="w-4 h-4" /> Régularisation
         </button>
       </div>
 
       {/* KPIs */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Calendar className="w-4 h-4 text-blue-500" />
-              <span className="text-sm text-gray-500">Collectes</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{stats.totalCollections}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Weight className="w-4 h-4 text-green-500" />
+            <span className="text-sm text-gray-500">Poids total</span>
           </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Weight className="w-4 h-4 text-green-500" />
-              <span className="text-sm text-gray-500">Poids total</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{(stats.totalWeightKg / 1000).toFixed(2)} t</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Package className="w-4 h-4 text-orange-500" />
-              <span className="text-sm text-gray-500">Sacs/bacs</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{stats.totalBags}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Weight className="w-4 h-4 text-purple-500" />
-              <span className="text-sm text-gray-500">Moy/collecte</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{stats.avgWeightPerCollection} kg</p>
-          </div>
+          <p className="text-2xl font-bold text-gray-800">{(totalWeight / 1000).toFixed(2)} t</p>
         </div>
-      )}
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Package className="w-4 h-4 text-blue-500" />
+            <span className="text-sm text-gray-500">Pesées</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{weightRecords.length}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Truck className="w-4 h-4 text-orange-500" />
+            <span className="text-sm text-gray-500">Tournées</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{Object.keys(groupedByRoute).length}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Weight className="w-4 h-4 text-purple-500" />
+            <span className="text-sm text-gray-500">Moy/pesée</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{weightRecords.length > 0 ? Math.round(totalWeight / weightRecords.length) : 0} kg</p>
+        </div>
+      </div>
 
-      {/* Filtre dates */}
-      <div className="flex gap-3 mb-4 items-center">
+      {/* Filtres */}
+      <div className="flex gap-3 mb-4 items-center flex-wrap">
         <label className="text-sm text-gray-500">Du</label>
         <input type="date" value={dateRange.startDate} onChange={e => setDateRange({...dateRange, startDate: e.target.value})} className="border rounded-lg px-3 py-1.5 text-sm" />
         <label className="text-sm text-gray-500">au</label>
         <input type="date" value={dateRange.endDate} onChange={e => setDateRange({...dateRange, endDate: e.target.value})} className="border rounded-lg px-3 py-1.5 text-sm" />
+        <select value={filterRoute} onChange={e => setFilterRoute(e.target.value)} className="border rounded-lg px-3 py-1.5 text-sm">
+          <option value="">Toutes les origines</option>
+          <option value="Collecte de CAV">Collecte de CAV</option>
+          <option value="Apport Volontaire">Apport Volontaire</option>
+          <option value="Tournée">Tournée</option>
+          <option value="Recyclage">Recyclage</option>
+        </select>
       </div>
 
-      {/* Formulaire saisie */}
-      {showForm && (
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Saisir une collecte</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select value={form.routeId} onChange={e => onRouteChange(e.target.value)} className="border rounded-lg px-3 py-2">
-              <option value="">Tournée (optionnel)...</option>
-              {routes.map(r => <option key={r.id} value={r.id}>{r.name} ({r.sector})</option>)}
-            </select>
-            <select required value={form.collectionPointId} onChange={e => setForm({...form, collectionPointId: e.target.value})} className="border rounded-lg px-3 py-2">
-              <option value="">Point de collecte...</option>
-              {displayPoints.map(p => <option key={p.id} value={p.id}>{p.name} - {p.city}</option>)}
-            </select>
-            <input required type="date" value={form.collectionDate} onChange={e => setForm({...form, collectionDate: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="border rounded-lg px-3 py-2">
-              {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-            <div>
-              <label className="text-xs text-gray-500">Poids (kg)</label>
-              <input type="number" step="0.1" placeholder="0" value={form.weightKg} onChange={e => setForm({...form, weightKg: e.target.value})} className="border rounded-lg px-3 py-2 w-full" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Nombre de sacs/bacs</label>
-              <input type="number" placeholder="0" value={form.bagsCount} onChange={e => setForm({...form, bagsCount: e.target.value})} className="border rounded-lg px-3 py-2 w-full" />
-            </div>
-            <textarea placeholder="Notes" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="border rounded-lg px-3 py-2 col-span-full" rows={2} />
-            <div className="col-span-full flex gap-2">
-              <button type="submit" className="bg-soltex-green text-white px-6 py-2 rounded-lg">Enregistrer</button>
-              <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg">Annuler</button>
-            </div>
-          </form>
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-lg w-fit">
+        {[
+          { val: 'tonnages', label: 'Par tournée' },
+          { val: 'historique', label: 'Détail chronologique' },
+        ].map(t => (
+          <button key={t.val} onClick={() => setActiveTab(t.val)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === t.val ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Vue par tournée */}
+      {activeTab === 'tonnages' && (
+        <div className="space-y-3">
+          {Object.entries(groupedByRoute)
+            .sort((a, b) => b[1].total - a[1].total)
+            .map(([routeName, data]) => (
+              <div key={routeName} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-soltex-green" />
+                    <span className="font-semibold text-sm text-gray-800">{routeName}</span>
+                    <span className="text-xs text-gray-400">{data.records.length} pesées</span>
+                  </div>
+                  <span className="font-bold text-soltex-green">{(data.total / 1000).toFixed(2)} t</span>
+                </div>
+                <div className="divide-y max-h-48 overflow-y-auto">
+                  {data.records.slice(0, 10).map(r => (
+                    <div key={r.id} className="px-4 py-2 flex items-center justify-between text-sm">
+                      <span className="text-gray-500">{r.weighedAt ? new Date(r.weighedAt).toLocaleDateString('fr-FR') : '-'}</span>
+                      <span className="font-medium">{r.poidsNet} kg</span>
+                      <span className="text-xs text-gray-400">{r.origine}</span>
+                    </div>
+                  ))}
+                  {data.records.length > 10 && (
+                    <div className="px-4 py-2 text-xs text-gray-400 text-center">
+                      +{data.records.length - 10} pesées supplémentaires
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          {Object.keys(groupedByRoute).length === 0 && (
+            <div className="text-center py-8 text-gray-400">Aucune donnée de tonnage sur cette période</div>
+          )}
         </div>
       )}
 
-      {/* Liste */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-gray-50">
-              <th className="text-left p-3 text-sm font-semibold text-gray-600">Date</th>
-              <th className="text-left p-3 text-sm font-semibold text-gray-600">Tournée</th>
-              <th className="text-left p-3 text-sm font-semibold text-gray-600">Point</th>
-              <th className="text-left p-3 text-sm font-semibold text-gray-600">Collecteur</th>
-              <th className="text-right p-3 text-sm font-semibold text-gray-600">Poids</th>
-              <th className="text-right p-3 text-sm font-semibold text-gray-600">Sacs</th>
-              <th className="text-center p-3 text-sm font-semibold text-gray-600">Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {collections.map(c => (
-              <tr key={c.id} className="border-b hover:bg-gray-50">
-                <td className="p-3 text-sm text-gray-600">{new Date(c.collectionDate).toLocaleDateString('fr-FR')}</td>
-                <td className="p-3 text-sm text-gray-600">{c.route?.name || '-'}</td>
-                <td className="p-3 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-gray-400" />
-                    {c.collectionPoint?.name || '-'}
-                  </div>
-                  <span className="text-xs text-gray-400">{c.collectionPoint?.city}</span>
-                </td>
-                <td className="p-3 text-sm text-gray-600">{c.employee ? `${c.employee.firstName} ${c.employee.lastName[0]}.` : '-'}</td>
-                <td className="p-3 text-sm text-gray-600 text-right">{c.weightKg ? `${c.weightKg} kg` : '-'}</td>
-                <td className="p-3 text-sm text-gray-600 text-right">{c.bagsCount || '-'}</td>
-                <td className="p-3 text-center">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CONFIG[c.status]?.color || 'bg-gray-100 text-gray-600'}`}>{STATUS_CONFIG[c.status]?.label || c.status}</span>
-                </td>
+      {/* Vue chronologique */}
+      {activeTab === 'historique' && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3 font-semibold text-gray-600">Date</th>
+                <th className="text-left p-3 font-semibold text-gray-600">Origine</th>
+                <th className="text-left p-3 font-semibold text-gray-600">Catégorie</th>
+                <th className="text-right p-3 font-semibold text-gray-600">Poids net</th>
+                <th className="text-right p-3 font-semibold text-gray-600">Tare</th>
+                <th className="text-right p-3 font-semibold text-gray-600">Poids brut</th>
               </tr>
-            ))}
-            {collections.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-400">Aucune collecte sur cette période</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {weightRecords.slice(0, 100).map(r => (
+                <tr key={r.id} className="border-b hover:bg-gray-50">
+                  <td className="p-3 text-gray-600">{r.weighedAt ? new Date(r.weighedAt).toLocaleDateString('fr-FR') : '-'}</td>
+                  <td className="p-3 text-gray-600">{r.origine || '-'}</td>
+                  <td className="p-3 text-gray-700 font-medium">{r.categorie || '-'}</td>
+                  <td className="p-3 text-right font-semibold">{r.poidsNet ? `${r.poidsNet} kg` : '-'}</td>
+                  <td className="p-3 text-right text-gray-500">{r.tare ? `${r.tare} kg` : '-'}</td>
+                  <td className="p-3 text-right text-gray-500">{r.poidsBrut ? `${r.poidsBrut} kg` : '-'}</td>
+                </tr>
+              ))}
+              {weightRecords.length === 0 && (
+                <tr><td colSpan={6} className="text-center py-8 text-gray-400">Aucun enregistrement</td></tr>
+              )}
+              {weightRecords.length > 100 && (
+                <tr><td colSpan={6} className="text-center py-4 text-xs text-gray-400">Affichage limité aux 100 premiers enregistrements</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Formulaire régularisation */}
+      {showRegForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowRegForm(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-bold">Régularisation de tonnage</h2>
+              <button onClick={() => setShowRegForm(false)} className="text-gray-400"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleRegSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-gray-500">Origine</label>
+                <select value={regForm.origine} onChange={e => setRegForm({...regForm, origine: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm mt-1">
+                  <option value="Collecte de CAV">Collecte de CAV</option>
+                  <option value="Apport Volontaire">Apport Volontaire</option>
+                  <option value="Tournée">Tournée</option>
+                  <option value="Recyclage">Recyclage</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">Catégorie / Tournée</label>
+                <input type="text" value={regForm.categorie} onChange={e => setRegForm({...regForm, categorie: e.target.value})} required
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1" placeholder="Ex: Barentin 1, Apport Volontaire..." />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">Poids net (kg)</label>
+                <input type="number" value={regForm.poidsNet} onChange={e => setRegForm({...regForm, poidsNet: e.target.value})} required
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">Date</label>
+                <input type="date" value={regForm.weighedAt} onChange={e => setRegForm({...regForm, weighedAt: e.target.value})}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500">Notes</label>
+                <textarea value={regForm.notes} onChange={e => setRegForm({...regForm, notes: e.target.value})}
+                  className="w-full border rounded-lg px-3 py-2 text-sm mt-1" rows={2} placeholder="Motif de la régularisation..." />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowRegForm(false)} className="px-4 py-2 border rounded-lg text-sm">Annuler</button>
+                <button type="submit" className="px-4 py-2 bg-soltex-green text-white rounded-lg text-sm">Enregistrer</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
