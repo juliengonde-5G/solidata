@@ -109,7 +109,7 @@ export default function Settings() {
                         <label className="text-sm font-medium text-gray-700">{s.label || s.key}</label>
                         {s.description && <p className="text-xs text-gray-400">{s.description}</p>}
                       </div>
-                      <div className="flex items-center gap-2 w-80">
+                      <div className={`flex items-center gap-2 ${s.key.includes('template') ? 'w-full mt-2' : 'w-80'}`}>
                         {s.type === 'boolean' ? (
                           <select
                             value={s.value}
@@ -119,6 +119,13 @@ export default function Settings() {
                             <option value="true">Oui</option>
                             <option value="false">Non</option>
                           </select>
+                        ) : s.key.includes('template') ? (
+                          <textarea
+                            value={s.value || ''}
+                            onChange={e => updateLocalSetting(s.key, e.target.value)}
+                            rows={4}
+                            className="border rounded-lg px-3 py-2 w-full text-sm resize-y"
+                          />
                         ) : (
                           <input
                             type={s.type === 'number' ? 'number' : 'text'}

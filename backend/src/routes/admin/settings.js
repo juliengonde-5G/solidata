@@ -29,6 +29,12 @@ const DEFAULT_SETTINGS = [
   { key: 'reporting.reuse_rate', value: '55', type: 'number', category: 'reporting', label: 'Taux de réemploi par défaut (%)', description: 'Estimation pour les rapports' },
   { key: 'reporting.recycle_rate', value: '32', type: 'number', category: 'reporting', label: 'Taux de recyclage par défaut (%)', description: 'Estimation pour les rapports' },
 
+  // Email
+  { key: 'email_rejection_template', value: 'Bonjour {prenom},\n\nNous vous remercions de l\'intérêt que vous portez à Solidarité Textiles.\n\nAprès examen attentif de votre candidature, nous avons le regret de vous informer que votre profil n\'a pas été retenu pour ce poste.\n\nNous vous souhaitons bonne continuation dans vos recherches.\n\nCordialement,\nSolidarité Textiles', type: 'string', category: 'email', label: 'Modèle email de refus', description: 'Variables disponibles: {prenom}, {nom}' },
+  { key: 'email_recruitment_template', value: 'Bonjour {prenom},\n\nNous avons le plaisir de vous confirmer votre recrutement au sein de Solidarité Textiles.\n\nVous trouverez ci-joint les documents suivants :\n- Les engagements réciproques\n- Le règlement intérieur\n- L\'attestation mutuelle\n\nNous vous attendons avec impatience.\n\nCordialement,\nSolidarité Textiles', type: 'string', category: 'email', label: 'Modèle courrier de recrutement', description: 'Variables disponibles: {prenom}, {nom}' },
+  { key: 'sms_convocation_template', value: 'Bonjour {prenom}, nous vous confirmons votre rendez-vous le {date} {lieu}. Merci de confirmer votre présence. Solidarité Textiles', type: 'string', category: 'email', label: 'Modèle SMS convocation', description: 'Variables: {prenom}, {nom}, {date}, {lieu}' },
+  { key: 'sms_preinterview_template', value: 'Bonjour {prenom}, votre entretien est prévu demain. Pensez à apporter votre CV, une pièce d\'identité et vos questions. À demain ! Solidarité Textiles', type: 'string', category: 'email', label: 'Modèle SMS veille entretien', description: 'Variables: {prenom}, {nom}, {date}' },
+
   // Sécurité
   { key: 'security.session_duration', value: '24', type: 'number', category: 'securite', label: 'Durée de session (heures)', description: 'Expiration du token JWT' },
   { key: 'security.min_password_length', value: '6', type: 'number', category: 'securite', label: 'Longueur min. mot de passe', description: 'Nombre de caractères minimum' },

@@ -8,7 +8,7 @@ const { authenticate, requireRole } = require('../../middleware/auth');
 
 const router = express.Router();
 
-const VALID_STATUSES = ['candidature_recue', 'a_qualifier', 'non_retenu', 'convoque', 'recrute'];
+const VALID_STATUSES = ['candidature_recue', 'a_convoquer', 'a_qualifier', 'non_retenu', 'convoque', 'recrute', 'refus_candidat'];
 
 // Configuration multer pour upload CV
 const storage = multer.diskStorage({
@@ -70,11 +70,17 @@ router.get('/kanban', authenticate, async (req, res) => {
 
     const kanban = {
       candidature_recue: [],
-      a_qualifier: [],
+      a_convoquer: [],
       non_retenu: [],
       convoque: [],
-      recrute: []
+      recrute: [],
+      refus_candidat: []
     };
+
+    // Migrer les anciens a_qualifier vers a_convoquer dans l'affichage
+    candidates.forEach(c => {
+      if (c.status === 'a_qualifier') c.status = 'a_convoquer';
+    });
 
     candidates.forEach(c => {
       if (kanban[c.status]) {
@@ -453,6 +459,224 @@ router.get('/:id/summary', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Get summary error:', err);
     res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/recruitment/candidates/:id/ocr — Extraction texte CV (OCR simplifié)
+router.post('/:id/ocr', authenticate, async (req, res) => {
+  try {
+    const candidate = await Candidate.findByPk(req.params.id);
+    if (!candidate) return res.status(404).json({ error: 'Candidat non trouvé' });
+    if (!candidate.cvText && !candidate.cvFilePath) {
+      return res.status(400).json({ error: 'Aucun CV disponible pour l\'extraction' });
+    }
+
+    let text = candidate.cvText || '';
+
+    // Si pas de texte extrait, essayer de lire le fichier (pour les PDF textuels)
+    if (!text && candidate.cvFilePath) {
+      try {
+        const fs = require('fs');
+        const raw = fs.readFileSync(candidate.cvFilePath, 'utf8');
+        text = raw;
+      } catch { /* pas de texte brut extractible */ }
+    }
+
+    if (!text) {
+      return res.status(400).json({ error: 'Texte du CV non disponible. Uploadez un CV au format texte/PDF.' });
+    }
+
+    // Extraction par patterns regex
+    const result = {};
+
+    // Email
+    const emailMatch = text.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+    if (emailMatch) result.email = emailMatch[0].toLowerCase();
+
+    // Téléphone (formats FR: 06, 07, +33)
+    const phoneMatch = text.match(/(?:\+33|0)\s?[67][\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}/);
+    if (phoneMatch) result.phone = phoneMatch[0].replace(/[\s.-]/g, '');
+
+    // Permis B
+    const permisRegex = /permis\s*b|permis\s*de\s*conduire|cat[ée]gorie\s*b/i;
+    result.permisB = permisRegex.test(text);
+
+    // CACES
+    const cacesRegex = /caces|certificat\s+d'aptitude/i;
+    result.caces = cacesRegex.test(text);
+
+    // Nom / Prénom (première ligne ou pattern "NOM Prénom")
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && l.length < 60);
+    if (lines.length >= 1) {
+      const firstLine = lines[0].replace(/[^a-zA-ZÀ-ÿ\s-]/g, '').trim();
+      const parts = firstLine.split(/\s+/);
+      if (parts.length >= 2) {
+        // Heuristique: le mot en majuscules = nom, l'autre = prénom
+        const upper = parts.find(p => p === p.toUpperCase() && p.length > 1);
+        const lower = parts.find(p => p !== p.toUpperCase() && p.length > 1);
+        if (upper) result.lastName = upper.charAt(0) + upper.slice(1).toLowerCase();
+        if (lower) result.firstName = lower;
+      }
+    }
+
+    // Sauvegarder le texte extrait s'il n'était pas déjà stocké
+    if (!candidate.cvText && text) {
+      await candidate.update({ cvText: text.substring(0, 10000) });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('OCR error:', err);
+    res.status(500).json({ error: 'Erreur extraction CV' });
+  }
+});
+
+// POST /api/recruitment/candidates/:id/sms-convocation — Envoi SMS convocation
+router.post('/:id/sms-convocation', authenticate, async (req, res) => {
+  try {
+    const candidate = await Candidate.findByPk(req.params.id);
+    if (!candidate) return res.status(404).json({ error: 'Candidat non trouvé' });
+    if (!candidate.phone) return res.status(400).json({ error: 'Numéro de téléphone manquant' });
+
+    const { convocationDate, convocationLocation } = req.body;
+    if (!convocationDate) return res.status(400).json({ error: 'Date de convocation requise' });
+
+    const locationLabels = {
+      siege: 'au siège de Solidarité Textiles, Le Houlme',
+      boutique_lhopital: 'à la boutique L\'Hôpital',
+      boutique_st_sever: 'à la boutique St Sever',
+      boutique_vernon: 'à la boutique Vernon'
+    };
+
+    const dateFormatted = new Date(convocationDate).toLocaleDateString('fr-FR', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const smsBody = `Bonjour ${candidate.firstName}, nous vous confirmons votre rendez-vous le ${dateFormatted} ${locationLabels[convocationLocation] || convocationLocation}. Merci de confirmer votre présence. Solidarité Textiles`;
+
+    // Sauvegarder les infos de convocation
+    await candidate.update({
+      convocationDate: new Date(convocationDate),
+      convocationLocation: convocationLocation,
+      convocationSmsStatus: 'sent'
+    });
+
+    // Log l'historique
+    await CandidateHistory.create({
+      candidateId: candidate.id,
+      fromStatus: candidate.status,
+      toStatus: candidate.status,
+      changedBy: req.user.id,
+      comment: `SMS de convocation envoyé: ${dateFormatted} - ${locationLabels[convocationLocation] || convocationLocation}`
+    });
+
+    // TODO: Intégrer un service SMS réel (OVH, Twilio, etc.)
+    // Pour l'instant, on log le message
+    console.log(`[SMS] To: ${candidate.phone} | Message: ${smsBody}`);
+
+    res.json({ message: 'Convocation enregistrée', smsBody });
+  } catch (err) {
+    console.error('SMS convocation error:', err);
+    res.status(500).json({ error: 'Erreur envoi convocation' });
+  }
+});
+
+// POST /api/recruitment/candidates/:id/send-rejection — Envoi email de refus
+router.post('/:id/send-rejection', authenticate, async (req, res) => {
+  try {
+    const candidate = await Candidate.findByPk(req.params.id);
+    if (!candidate) return res.status(404).json({ error: 'Candidat non trouvé' });
+    if (!candidate.email) return res.status(400).json({ error: 'Email du candidat manquant' });
+
+    const { AppSettings } = require('../../models');
+    const template = await AppSettings.getValue('email_rejection_template',
+      `Bonjour {prenom},\n\nNous vous remercions de l'intérêt que vous portez à Solidarité Textiles.\n\nAprès examen attentif de votre candidature, nous avons le regret de vous informer que votre profil n'a pas été retenu pour ce poste.\n\nNous vous souhaitons bonne continuation dans vos recherches.\n\nCordialement,\nSolidarité Textiles`
+    );
+
+    const emailBody = template
+      .replace(/{prenom}/g, candidate.firstName || '')
+      .replace(/{nom}/g, candidate.lastName || '');
+
+    // TODO: Intégrer un service email réel (nodemailer)
+    console.log(`[EMAIL REJECTION] To: ${candidate.email} | Body: ${emailBody}`);
+
+    await CandidateHistory.create({
+      candidateId: candidate.id,
+      fromStatus: candidate.status,
+      toStatus: candidate.status,
+      changedBy: req.user.id,
+      comment: 'Email de refus envoyé'
+    });
+
+    res.json({ message: 'Email de refus envoyé', emailBody });
+  } catch (err) {
+    console.error('Send rejection error:', err);
+    res.status(500).json({ error: 'Erreur envoi email' });
+  }
+});
+
+// POST /api/recruitment/candidates/:id/send-recruitment-letter — Envoi courrier recrutement
+router.post('/:id/send-recruitment-letter', authenticate, async (req, res) => {
+  try {
+    const candidate = await Candidate.findByPk(req.params.id);
+    if (!candidate) return res.status(404).json({ error: 'Candidat non trouvé' });
+    if (!candidate.email) return res.status(400).json({ error: 'Email du candidat manquant' });
+
+    const { AppSettings } = require('../../models');
+    const template = await AppSettings.getValue('email_recruitment_template',
+      `Bonjour {prenom},\n\nNous avons le plaisir de vous confirmer votre recrutement au sein de Solidarité Textiles.\n\nVous trouverez ci-joint les documents suivants :\n- Les engagements réciproques\n- Le règlement intérieur\n- L'attestation mutuelle\n\nNous vous attendons avec impatience.\n\nCordialement,\nSolidarité Textiles`
+    );
+
+    const emailBody = template
+      .replace(/{prenom}/g, candidate.firstName || '')
+      .replace(/{nom}/g, candidate.lastName || '');
+
+    // TODO: Intégrer un service email réel avec pièces jointes
+    console.log(`[EMAIL RECRUITMENT] To: ${candidate.email} | Body: ${emailBody}`);
+
+    await CandidateHistory.create({
+      candidateId: candidate.id,
+      fromStatus: candidate.status,
+      toStatus: candidate.status,
+      changedBy: req.user.id,
+      comment: 'Courrier de recrutement envoyé'
+    });
+
+    res.json({ message: 'Courrier de recrutement envoyé', emailBody });
+  } catch (err) {
+    console.error('Send recruitment letter error:', err);
+    res.status(500).json({ error: 'Erreur envoi courrier' });
+  }
+});
+
+// GET /api/recruitment/candidates/:id/pre-interview-questions — 20 questions pré-entretien
+router.get('/:id/pre-interview-questions', authenticate, async (req, res) => {
+  try {
+    const questions = [
+      { id: 1, question: "Qu'est-ce qui vous motive à travailler dans le secteur du textile solidaire ?" },
+      { id: 2, question: "Comment décririez-vous votre expérience professionnelle ?" },
+      { id: 3, question: "Quelle est votre plus grande qualité au travail ?" },
+      { id: 4, question: "Quel aspect du travail en équipe appréciez-vous le plus ?" },
+      { id: 5, question: "Comment réagissez-vous face à une situation stressante ?" },
+      { id: 6, question: "Avez-vous déjà travaillé dans un environnement de tri ou logistique ?" },
+      { id: 7, question: "Quels sont vos horaires de disponibilité ?" },
+      { id: 8, question: "Comment vous organisez-vous dans votre travail quotidien ?" },
+      { id: 9, question: "Qu'attendez-vous de cette expérience professionnelle ?" },
+      { id: 10, question: "Avez-vous des contraintes de transport pour vous rendre au travail ?" },
+      { id: 11, question: "Comment percevez-vous le travail physique (port de charges, station debout) ?" },
+      { id: 12, question: "Avez-vous une formation ou un diplôme en particulier ?" },
+      { id: 13, question: "Que connaissez-vous de Solidarité Textiles et de son activité ?" },
+      { id: 14, question: "Quels sont vos objectifs professionnels à court terme ?" },
+      { id: 15, question: "Comment réagissez-vous face aux consignes et à l'autorité ?" },
+      { id: 16, question: "Parlez-nous d'une difficulté que vous avez surmontée récemment." },
+      { id: 17, question: "Que signifie pour vous le respect des horaires et de la ponctualité ?" },
+      { id: 18, question: "Comment vous sentez-vous à l'idée de découvrir un nouveau métier ?" },
+      { id: 19, question: "Avez-vous des questions sur le poste ou l'association ?" },
+      { id: 20, question: "Y a-t-il quelque chose que vous aimeriez que nous sachions sur vous ?" }
+    ];
+    res.json({ questions, note: "Il n'y a aucune mauvaise réponse. Ces questions servent d'axes de discussion pour le jour J." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

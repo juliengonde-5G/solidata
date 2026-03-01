@@ -76,7 +76,6 @@ function getNavSections(role, team) {
         { path: '/equipe/affectations', label: 'Affectations', icon: ClipboardList },
         { path: '/equipe/postes-travail', label: 'Postes de travail', icon: Shield },
         { path: '/equipe/vak', label: 'VAK', icon: PartyPopper },
-        { path: '/equipe/vehicules', label: 'Véhicules', icon: Truck },
         { path: '/equipe/planning', label: 'Planning', icon: CalendarDays },
       ]
     });
@@ -93,6 +92,7 @@ function getNavSections(role, team) {
           { path: '/collecte/planning', label: 'Planning', icon: Compass },
           { path: '/collecte/tournees', label: 'Tournées std', icon: Route },
           { path: '/collecte/mobile', label: 'Ma tournée', icon: Truck },
+          { path: '/equipe/vehicules', label: 'Véhicules', icon: Truck },
         ]),
         { path: '/collecte/carte', label: 'Carte CAV', icon: Map },
         { path: '/collecte/live', label: 'Suivi live', icon: Radio },

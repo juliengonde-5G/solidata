@@ -37,8 +37,26 @@ const Candidate = sequelize.define('Candidate', {
     type: DataTypes.STRING(50),
     defaultValue: 'candidature_recue',
     validate: {
-      isIn: [['candidature_recue', 'a_qualifier', 'non_retenu', 'convoque', 'recrute']]
+      isIn: [['candidature_recue', 'a_convoquer', 'a_qualifier', 'non_retenu', 'convoque', 'recrute', 'refus_candidat']]
     }
+  },
+  // Infos convocation
+  convocationDate: {
+    type: DataTypes.DATE,
+    comment: 'Date et heure du RDV de convocation'
+  },
+  convocationLocation: {
+    type: DataTypes.STRING,
+    comment: 'Lieu: siege ou boutique'
+  },
+  convocationSmsStatus: {
+    type: DataTypes.STRING(20),
+    comment: 'sent, confirmed, no_response'
+  },
+  convocationAccepted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: null,
+    comment: 'Candidat a accepté le rdv'
   },
   // Informations candidature
   permisB: {

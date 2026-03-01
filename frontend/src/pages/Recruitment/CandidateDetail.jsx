@@ -4,23 +4,28 @@ import api from '../../utils/api';
 import {
   ArrowLeft, User, FileText, Calendar, MessageSquare,
   ClipboardList, Brain, Download, Save, Car, Wrench,
-  UserCheck, Users, Copy, Check, ExternalLink
+  UserCheck, Users, Copy, Check, ExternalLink, Send,
+  Phone, MapPin, Mail, XCircle, ScanLine
 } from 'lucide-react';
 
 const STATUS_LABELS = {
   candidature_recue: 'Candidature reçue',
-  a_qualifier: 'À qualifier',
+  a_convoquer: 'À convoquer',
+  a_qualifier: 'À convoquer',
   non_retenu: 'Non retenu',
   convoque: 'Convoqué',
-  recrute: 'Recruté'
+  recrute: 'Recruté',
+  refus_candidat: 'Refus du candidat'
 };
 
 const STATUS_COLORS = {
   candidature_recue: 'bg-blue-100 text-blue-700',
+  a_convoquer: 'bg-amber-100 text-amber-700',
   a_qualifier: 'bg-amber-100 text-amber-700',
   non_retenu: 'bg-red-100 text-red-700',
   convoque: 'bg-purple-100 text-purple-700',
-  recrute: 'bg-green-100 text-green-700'
+  recrute: 'bg-green-100 text-green-700',
+  refus_candidat: 'bg-gray-100 text-gray-700'
 };
 
 const ASSESSMENT_LABELS = {
@@ -69,6 +74,11 @@ export default function CandidateDetail() {
   });
   const [recruiting, setRecruiting] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+  const [convocationForm, setConvocationForm] = useState({
+    date: '', time: '09:00', location: 'siege'
+  });
 
   useEffect(() => {
     async function fetchData() {
@@ -180,10 +190,91 @@ export default function CandidateDetail() {
     }
   };
 
+  // Extraction OCR du CV
+  const handleOCR = async () => {
+    setOcrLoading(true);
+    try {
+      const res = await api.post(`/recruitment/candidates/${id}/ocr`);
+      const ocr = res.data;
+      // Pre-fill fields from OCR results
+      const updates = {};
+      if (ocr.firstName && !editData.firstName) updates.firstName = ocr.firstName;
+      if (ocr.lastName && !editData.lastName) updates.lastName = ocr.lastName;
+      if (ocr.email && !editData.email) updates.email = ocr.email;
+      if (ocr.phone && !editData.phone) updates.phone = ocr.phone;
+      if (ocr.permisB !== undefined) updates.permisB = ocr.permisB;
+      if (ocr.caces !== undefined) updates.caces = ocr.caces;
+      if (Object.keys(updates).length > 0) {
+        setEditData(prev => ({ ...prev, ...updates }));
+        alert(`Données extraites du CV: ${Object.keys(updates).join(', ')}`);
+      } else {
+        alert('Aucune nouvelle donnée extraite du CV');
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erreur lors de l\'extraction du CV');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // Envoi SMS de convocation
+  const handleSendConvocationSMS = async () => {
+    if (!editData.phone) return alert('Numéro de téléphone requis');
+    if (!convocationForm.date) return alert('Date de convocation requise');
+    setSmsSending(true);
+    try {
+      await api.post(`/recruitment/candidates/${id}/sms-convocation`, {
+        convocationDate: `${convocationForm.date}T${convocationForm.time}`,
+        convocationLocation: convocationForm.location
+      });
+      alert('SMS de convocation envoyé');
+      const candRes = await api.get(`/recruitment/candidates/${id}`);
+      setCandidate(candRes.data);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erreur envoi SMS');
+    } finally {
+      setSmsSending(false);
+    }
+  };
+
+  // Marquer refus candidat
+  const handleRefusCandidat = async () => {
+    try {
+      await api.put(`/recruitment/candidates/${id}/move`, { status: 'refus_candidat', comment: 'N\'a pas répondu à la convocation' });
+      const candRes = await api.get(`/recruitment/candidates/${id}`);
+      setCandidate(candRes.data);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erreur');
+    }
+  };
+
+  // Envoyer mail de refus (non retenu)
+  const handleSendRejectionEmail = async () => {
+    if (!editData.email) return alert('Email du candidat requis');
+    try {
+      await api.post(`/recruitment/candidates/${id}/send-rejection`);
+      alert('Email de refus envoyé');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erreur envoi email');
+    }
+  };
+
+  // Envoyer courrier type recrutement
+  const handleSendRecruitmentLetter = async () => {
+    if (!editData.email) return alert('Email du candidat requis');
+    try {
+      await api.post(`/recruitment/candidates/${id}/send-recruitment-letter`);
+      alert('Courrier de recrutement envoyé');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erreur envoi courrier');
+    }
+  };
+
   if (loading) return <div className="text-center py-12 text-gray-500">Chargement...</div>;
   if (!candidate) return <div className="text-center py-12 text-red-500">Candidat non trouvé</div>;
 
   const isConvoqueStage = ['convoque', 'recrute'].includes(candidate.status);
+  const isAConvoquer = ['a_convoquer', 'a_qualifier'].includes(candidate.status);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -344,6 +435,163 @@ export default function CandidateDetail() {
               placeholder="Notes sur le candidat..."
             />
           </div>
+
+          {/* === SECTION À CONVOQUER === */}
+          {isAConvoquer && (
+            <>
+              {/* OCR du CV */}
+              {candidate.cvFilePath && (
+                <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-400">
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <ScanLine className="w-5 h-5 text-amber-600" />
+                    Extraction automatique du CV
+                  </h2>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Extraire automatiquement le nom, prénom, email, téléphone, permis B et CACES depuis le CV.
+                  </p>
+                  <button
+                    onClick={handleOCR}
+                    disabled={ocrLoading}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <ScanLine className={`w-4 h-4 ${ocrLoading ? 'animate-pulse' : ''}`} />
+                    {ocrLoading ? 'Extraction en cours...' : 'Extraire les données du CV'}
+                  </button>
+                </div>
+              )}
+
+              {/* Convocation */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-400">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <Send className="w-5 h-5 text-amber-600" />
+                  Convocation
+                </h2>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Date</label>
+                      <input
+                        type="date"
+                        value={convocationForm.date}
+                        onChange={e => setConvocationForm({ ...convocationForm, date: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Heure</label>
+                      <input
+                        type="time"
+                        value={convocationForm.time}
+                        onChange={e => setConvocationForm({ ...convocationForm, time: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Lieu</label>
+                      <select
+                        value={convocationForm.location}
+                        onChange={e => setConvocationForm({ ...convocationForm, location: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg text-sm"
+                      >
+                        <option value="siege">Siège - Solidarité Textiles</option>
+                        <option value="boutique_lhopital">Boutique L'Hôpital</option>
+                        <option value="boutique_st_sever">Boutique St Sever</option>
+                        <option value="boutique_vernon">Boutique Vernon</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleSendConvocationSMS}
+                      disabled={smsSending || !editData.phone}
+                      className="bg-soltex-green hover:bg-soltex-green-dark text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Phone className="w-4 h-4" />
+                      {smsSending ? 'Envoi...' : 'Envoyer SMS de convocation'}
+                    </button>
+                    {!editData.phone && (
+                      <p className="text-xs text-red-500 flex items-center">Numéro de téléphone requis</p>
+                    )}
+                  </div>
+                  {candidate.convocationSmsStatus && (
+                    <div className={`text-sm px-3 py-2 rounded-lg ${
+                      candidate.convocationSmsStatus === 'confirmed' ? 'bg-green-50 text-green-700' :
+                      candidate.convocationSmsStatus === 'sent' ? 'bg-blue-50 text-blue-700' :
+                      'bg-gray-50 text-gray-600'
+                    }`}>
+                      SMS: {candidate.convocationSmsStatus === 'sent' ? 'Envoyé' :
+                            candidate.convocationSmsStatus === 'confirmed' ? 'Confirmé' : candidate.convocationSmsStatus}
+                      {candidate.convocationDate && ` - RDV le ${new Date(candidate.convocationDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions convocation */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-400">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Réponse du candidat</h2>
+                <div className="flex gap-3">
+                  <button
+                    onClick={async () => {
+                      await api.put(`/recruitment/candidates/${id}/move`, { status: 'convoque', comment: 'RDV accepté par le candidat' });
+                      const candRes = await api.get(`/recruitment/candidates/${id}`);
+                      setCandidate(candRes.data);
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+                  >
+                    <Check className="w-4 h-4" /> A accepté le RDV
+                  </button>
+                  <button
+                    onClick={handleRefusCandidat}
+                    className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+                  >
+                    <XCircle className="w-4 h-4" /> N'a pas répondu / Refuse
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* === SECTION NON RETENU === */}
+          {candidate.status === 'non_retenu' && (
+            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-400">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <Mail className="w-5 h-5 text-red-600" />
+                Email de refus
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Envoyer un email de refus automatique au candidat. Le modèle est configurable dans les paramètres.
+              </p>
+              <button
+                onClick={handleSendRejectionEmail}
+                disabled={!editData.email}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+              >
+                <Mail className="w-4 h-4" /> Envoyer l'email de refus
+              </button>
+            </div>
+          )}
+
+          {/* === SECTION RECRUTÉ - Courrier type === */}
+          {candidate.status === 'recrute' && (
+            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-400">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <Mail className="w-5 h-5 text-green-600" />
+                Documents de recrutement
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Envoyer les documents de recrutement par email : engagements, règlement intérieur, mutuelle. Les modèles sont configurables dans les paramètres.
+              </p>
+              <button
+                onClick={handleSendRecruitmentLetter}
+                disabled={!editData.email}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+              >
+                <Mail className="w-4 h-4" /> Envoyer le courrier de recrutement
+              </button>
+            </div>
+          )}
 
           {/* === SECTION CONVOQUÉ === */}
           {isConvoqueStage && (

@@ -6,22 +6,24 @@ import {
   useDroppable,
   useDraggable,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   closestCenter,
 } from '@dnd-kit/core';
 import api from '../../utils/api';
 import {
-  Inbox, XCircle, Search, Phone, Award,
-  Plus, ChevronLeft, ChevronRight, FileText, User, Car, Wrench, GripVertical
+  Inbox, XCircle, Phone, Award, Send,
+  Plus, ChevronLeft, ChevronRight, FileText, User, Car, Wrench, GripVertical, UserX
 } from 'lucide-react';
 
 const COLUMNS = [
   { key: 'candidature_recue', label: 'Candidatures reçues', icon: Inbox, color: 'border-blue-400', bgHeader: 'bg-blue-50', textColor: 'text-blue-700', dropBg: 'bg-blue-50/50' },
-  { key: 'a_qualifier', label: 'À qualifier', icon: Search, color: 'border-amber-400', bgHeader: 'bg-amber-50', textColor: 'text-amber-700', dropBg: 'bg-amber-50/50' },
+  { key: 'a_convoquer', label: 'À convoquer', icon: Send, color: 'border-amber-400', bgHeader: 'bg-amber-50', textColor: 'text-amber-700', dropBg: 'bg-amber-50/50' },
   { key: 'non_retenu', label: 'Non retenu', icon: XCircle, color: 'border-red-400', bgHeader: 'bg-red-50', textColor: 'text-red-700', dropBg: 'bg-red-50/50' },
   { key: 'convoque', label: 'Convoqué', icon: Phone, color: 'border-purple-400', bgHeader: 'bg-purple-50', textColor: 'text-purple-700', dropBg: 'bg-purple-50/50' },
   { key: 'recrute', label: 'Recruté', icon: Award, color: 'border-green-400', bgHeader: 'bg-green-50', textColor: 'text-green-700', dropBg: 'bg-green-50/50' },
+  { key: 'refus_candidat', label: 'Refus candidat', icon: UserX, color: 'border-gray-400', bgHeader: 'bg-gray-50', textColor: 'text-gray-700', dropBg: 'bg-gray-50/50' },
 ];
 
 export default function KanbanBoard() {
@@ -36,7 +38,8 @@ export default function KanbanBoard() {
   const scrollRef = useRef(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   );
 
   const fetchKanban = async () => {

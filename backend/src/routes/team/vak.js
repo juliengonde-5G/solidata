@@ -138,11 +138,15 @@ router.put('/assignments', requireRole('admin', 'manager', 'rh'), async (req, re
       return res.json({ message: 'Désaffecté' });
     }
 
-    const [assignment] = await VakAssignment.upsert({
-      vakEventId, date, vakWorkStationId, employeeId
-    }, {
-      conflictFields: ['vakEventId', 'date', 'vakWorkStationId']
-    });
+    // findOrCreate + update pour fiabilité (upsert parfois problématique avec index composite)
+    const existing = await VakAssignment.findOne({ where: { vakEventId, date, vakWorkStationId } });
+    let assignment;
+    if (existing) {
+      await existing.update({ employeeId });
+      assignment = existing;
+    } else {
+      assignment = await VakAssignment.create({ vakEventId, date, vakWorkStationId, employeeId });
+    }
 
     const full = await VakAssignment.findByPk(assignment.id, {
       include: [
@@ -152,6 +156,7 @@ router.put('/assignments', requireRole('admin', 'manager', 'rh'), async (req, re
     });
     res.json(full);
   } catch (err) {
+    console.error('VAK assign error:', err);
     res.status(500).json({ error: err.message });
   }
 });

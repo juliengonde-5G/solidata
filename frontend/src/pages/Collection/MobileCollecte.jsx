@@ -31,6 +31,16 @@ const QR_ISSUE_REASONS = [
   'Autre'
 ];
 
+// Images de remplissage (icônes textuelles car pas d'images uploadées)
+const FILL_LEVELS = [
+  { value: 0, label: 'Vide', emoji: '\u2B1C', color: 'bg-gray-100 border-gray-300 text-gray-600' },
+  { value: 25, label: 'Peu rempli', emoji: '\u2B1C\u2591', color: 'bg-green-50 border-green-300 text-green-700' },
+  { value: 50, label: 'À moitié', emoji: '\u2B1C\u2592', color: 'bg-yellow-50 border-yellow-300 text-yellow-700' },
+  { value: 75, label: 'Presque plein', emoji: '\u2B1C\u2593', color: 'bg-orange-50 border-orange-300 text-orange-700' },
+  { value: 100, label: 'Plein', emoji: '\u2B1B', color: 'bg-red-50 border-red-300 text-red-700' },
+  { value: 110, label: 'Déborde', emoji: '\u2B1B\u26A0', color: 'bg-red-100 border-red-500 text-red-800' },
+];
+
 // Calcul distance Haversine en km
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -327,182 +337,199 @@ export default function MobileCollecte() {
     const nextPt = getNextPoint();
     const distToNext = getDistToNext(nextPt);
 
+    // Calcul distance/temps restants
+    const remaining = sorted.filter(rp => rp.status === 'a_collecter');
+    let remainDist = 0;
+    let prev = currentPos ? { lat: currentPos.latitude, lng: currentPos.longitude } : { lat: DEPOT.lat, lng: DEPOT.lng };
+    for (const rp of remaining) {
+      const p = rp.collectionPoint;
+      if (p?.latitude && p?.longitude) {
+        remainDist += haversine(prev.lat, prev.lng, p.latitude, p.longitude);
+        prev = { lat: p.latitude, lng: p.longitude };
+      }
+    }
+    remainDist += haversine(prev.lat, prev.lng, DEPOT.lat, DEPOT.lng);
+    const remainTime = Math.round((remainDist / 30) * 60 + remaining.length * 12);
+
+    // Points multiples CAV à la même adresse
+    const nextPointCavs = nextPt?.collectionPoint?.nbCav || 1;
+
+    // Carte Google Maps embed URL
+    const mapUrl = nextPt?.collectionPoint?.latitude
+      ? `https://www.google.com/maps/embed/v1/directions?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&origin=${currentPos ? `${currentPos.latitude},${currentPos.longitude}` : `${DEPOT.lat},${DEPOT.lng}`}&destination=${nextPt.collectionPoint.latitude},${nextPt.collectionPoint.longitude}&mode=driving&language=fr`
+      : null;
+
     return (
-      <div className="max-w-lg mx-auto pb-28">
-        {/* Header tournée */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-3">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">
-                {activeRoute.templateRoute?.name || 'Tournée'}
-              </h2>
-              <p className="text-sm text-gray-500">
-                {new Date(activeRoute.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </p>
-            </div>
-            <span className={`text-xs px-3 py-1 rounded-full ${STATUS_COLORS[activeRoute.status]}`}>
-              {activeRoute.status === 'en_cours' ? 'En cours' : activeRoute.status}
-            </span>
+      <div className="max-w-lg mx-auto pb-36">
+        {/* Carte en haut de page */}
+        {mapUrl && activeRoute.status === 'en_cours' ? (
+          <div className="rounded-2xl overflow-hidden shadow-sm mb-3 h-48 bg-gray-100">
+            <iframe src={mapUrl} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
           </div>
+        ) : (
+          <div className="rounded-2xl bg-gray-100 h-48 mb-3 flex items-center justify-center text-gray-400 text-sm">
+            {!gpsActive ? (
+              <button onClick={startGPS} className="bg-soltex-green text-white px-4 py-2 rounded-lg text-sm font-medium">Activer le GPS</button>
+            ) : 'Carte indisponible'}
+          </div>
+        )}
 
-          {/* Barre de progression */}
-          <div className="mb-2">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>{done}/{total} collectés</span>
-              <span>{progress}%</span>
+        {/* Bandeau distance/temps restant */}
+        <div className="bg-white rounded-2xl shadow-sm p-3 mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <p className="text-lg font-bold text-gray-800">{remainDist < 1 ? `${Math.round(remainDist * 1000)} m` : `${remainDist.toFixed(1)} km`}</p>
+              <p className="text-[10px] text-gray-400 uppercase">Distance</p>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div className="bg-soltex-green h-3 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+            <div className="w-px h-8 bg-gray-200" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-gray-800">{remainTime < 60 ? `${remainTime} min` : `${Math.floor(remainTime / 60)}h${String(remainTime % 60).padStart(2, '0')}`}</p>
+              <p className="text-[10px] text-gray-400 uppercase">Temps</p>
+            </div>
+            <div className="w-px h-8 bg-gray-200" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-soltex-green">{done}/{total}</p>
+              <p className="text-[10px] text-gray-400 uppercase">Collectés</p>
             </div>
           </div>
-
-          {/* GPS + position */}
-          <div className="flex items-center gap-2 text-xs mt-2">
+          <div className="flex items-center gap-1">
             <div className={`w-2 h-2 rounded-full ${gpsActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-            <span className="text-gray-500">{gpsActive ? 'GPS actif' : 'GPS inactif'}</span>
-            {!gpsActive && activeRoute.status === 'en_cours' && (
-              <button onClick={startGPS} className="text-soltex-green text-xs underline">Activer</button>
-            )}
-            {currentPos && (
-              <span className="text-gray-400 ml-auto">
-                {currentPos.latitude.toFixed(4)}, {currentPos.longitude.toFixed(4)}
-              </span>
-            )}
+            <span className="text-[10px] text-gray-400">{gpsActive ? 'GPS' : 'GPS off'}</span>
           </div>
         </div>
 
-        {/* Prochain point + navigation */}
+        {/* PROCHAIN ARRÊT — uniquement la prochaine destination */}
         {nextPt && activeRoute.status === 'en_cours' && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-3">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-blue-600 uppercase">Prochain arrêt</div>
+              <div className="text-xs font-semibold text-blue-600 uppercase">Prochain arrêt ({remaining.length} restants)</div>
               {distToNext != null && (
-                <span className="text-xs text-blue-500">{distToNext < 1 ? `${Math.round(distToNext * 1000)} m` : `${distToNext.toFixed(1)} km`}</span>
+                <span className="text-sm font-bold text-blue-500">{distToNext < 1 ? `${Math.round(distToNext * 1000)} m` : `${distToNext.toFixed(1)} km`}</span>
               )}
             </div>
-            <p className="font-bold text-gray-800">{nextPt.collectionPoint?.name || 'Point'}</p>
-            <p className="text-xs text-gray-500">{nextPt.collectionPoint?.address}, {nextPt.collectionPoint?.city}</p>
+            <p className="font-bold text-gray-800 text-lg">{nextPt.collectionPoint?.name || 'Point'}</p>
+            <p className="text-sm text-gray-500">{nextPt.collectionPoint?.address}, {nextPt.collectionPoint?.city}</p>
+            {nextPointCavs > 1 && (
+              <p className="text-xs text-soltex-green font-semibold mt-1">{nextPointCavs} CAV sur cette adresse</p>
+            )}
+
+            {/* Saisie remplissage avec images */}
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 mb-2">Niveau de remplissage :</p>
+              {nextPointCavs > 1 ? (
+                // Saisie par CAV si plusieurs
+                <div className="space-y-2">
+                  {Array.from({ length: nextPointCavs }, (_, i) => (
+                    <div key={i} className="bg-white rounded-lg p-2">
+                      <p className="text-xs font-medium text-gray-600 mb-1">CAV {i + 1}</p>
+                      <div className="grid grid-cols-6 gap-1">
+                        {FILL_LEVELS.map(fl => (
+                          <button key={fl.value} onClick={() => {
+                            const arr = [...(Array.isArray(pointFillLevel) ? pointFillLevel : new Array(nextPointCavs).fill(50))];
+                            arr[i] = fl.value;
+                            setPointFillLevel(arr);
+                          }}
+                            className={`py-1.5 rounded-lg border-2 text-center text-[10px] font-medium transition-all ${
+                              (Array.isArray(pointFillLevel) ? pointFillLevel[i] : 50) === fl.value ? fl.color + ' border-current scale-105' : 'bg-white border-gray-200 text-gray-400'
+                            }`}
+                          >
+                            <div className="text-base">{fl.emoji}</div>
+                            <div className="leading-tight">{fl.label}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                // Saisie unique
+                <div className="grid grid-cols-6 gap-1.5">
+                  {FILL_LEVELS.map(fl => (
+                    <button key={fl.value} onClick={() => setPointFillLevel(fl.value)}
+                      className={`py-2 rounded-xl border-2 text-center text-xs font-medium transition-all ${
+                        pointFillLevel === fl.value ? fl.color + ' border-current scale-105 shadow' : 'bg-white border-gray-200 text-gray-400'
+                      }`}
+                    >
+                      <div className="text-lg">{fl.emoji}</div>
+                      <div className="leading-tight">{fl.label}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
+            <input type="text" placeholder="Notes (optionnel)" value={pointNotes}
+              onChange={e => setPointNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm mt-2" />
+
+            {/* Boutons d'action */}
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <button onClick={() => {
+                const avgFill = Array.isArray(pointFillLevel) ? Math.round(pointFillLevel.reduce((a, b) => a + b, 0) / pointFillLevel.length) : pointFillLevel;
+                handleScan(nextPt.collectionPointId, 'collecte', avgFill, pointNotes);
+              }}
+                className="bg-green-500 text-white rounded-lg py-3 text-sm font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1 col-span-2">
+                <CheckCircle className="w-5 h-5" /> Collecté
+              </button>
+              <button onClick={() => { handleScan(nextPt.collectionPointId, 'passe', undefined, 'Passé'); }}
+                className="bg-yellow-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
+                <AlertCircle className="w-4 h-4" /> Passer
+              </button>
+              <button onClick={() => { setShowQrIssue(nextPt.collectionPointId); setQrIssueReason(''); }}
+                className="bg-red-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
+                <AlertTriangle className="w-4 h-4" /> QR indisponible
+              </button>
+            </div>
+
+            {/* Navigation */}
             {nextPt.collectionPoint?.latitude && (
               <button onClick={() => openNavigation(nextPt.collectionPoint.latitude, nextPt.collectionPoint.longitude)}
                 className="mt-2 w-full bg-blue-500 text-white rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                <Navigation className="w-4 h-4" /> Naviguer vers ce point
+                <Navigation className="w-4 h-4" /> Naviguer
               </button>
             )}
           </div>
         )}
 
-        {/* Actions rapides */}
-        {activeRoute.status === 'en_cours' && (
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <button onClick={() => { setScanMode(true); setTimeout(() => scanInputRef.current?.focus(), 100); }}
-              className="bg-soltex-green text-white rounded-xl p-3 flex items-center justify-center gap-2 text-sm font-semibold active:scale-95 transition-transform shadow">
-              <ScanLine className="w-5 h-5" /> Scanner QR
-            </button>
-            <button onClick={() => setShowTruckFull(true)}
-              className="bg-amber-500 text-white rounded-xl p-3 flex items-center justify-center gap-2 text-sm font-semibold active:scale-95 transition-transform shadow">
-              <Truck className="w-5 h-5" /> Camion plein
-            </button>
+        {/* Progression compacte des points passés */}
+        {sorted.filter(rp => rp.status !== 'a_collecter').length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm p-3 mb-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Points traités</p>
+            <div className="flex flex-wrap gap-1.5">
+              {sorted.map((rp, idx) => (
+                <div key={rp.collectionPointId || idx}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+                    rp.status === 'collecte' ? 'bg-green-100 text-green-700' :
+                    rp.status === 'passe' ? 'bg-yellow-100 text-yellow-700' :
+                    rp.status === 'probleme' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-400'
+                  }`}
+                  title={rp.collectionPoint?.name}
+                >
+                  {idx + 1}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Liste des points */}
-        <div className="space-y-2">
-          {sorted.map((rp, idx) => {
-            const point = rp.collectionPoint;
-            const cfg = POINT_STATUS[rp.status] || POINT_STATUS.a_collecter;
-            const Icon = cfg.icon;
-            const isExpanded = expandedPoint === rp.collectionPointId;
-            const isNext = nextPt?.collectionPointId === rp.collectionPointId;
-
-            return (
-              <div key={rp.collectionPointId || idx}>
-                <div
-                  className={`bg-white rounded-xl border-2 ${cfg.color} p-4 transition-all ${isNext ? 'ring-2 ring-blue-400' : ''}`}
-                  onClick={() => setExpandedPoint(isExpanded ? null : rp.collectionPointId)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isNext ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                        {idx + 1}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-800 truncate">{point?.name || 'Point inconnu'}</p>
-                      <p className="text-xs text-gray-500 truncate">{point?.address}, {point?.city}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {point?.nbCav > 1 && <span className="text-xs text-soltex-green font-medium">{point.nbCav} CAV</span>}
-                        {point?.qrCode && <span className="text-[10px] text-gray-300 font-mono">{point.qrCode}</span>}
-                      </div>
-                    </div>
-                    <Icon className={`w-5 h-5 flex-shrink-0 ${rp.status === 'collecte' ? 'text-green-500' : rp.status === 'probleme' ? 'text-red-500' : rp.status === 'passe' ? 'text-yellow-500' : 'text-gray-400'}`} />
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                  </div>
-
-                  {rp.scannedAt && (
-                    <p className="text-xs text-gray-400 mt-1 ml-11">
-                      {new Date(rp.scannedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                      {rp.fillLevel != null && ` - Remplissage: ${rp.fillLevel}%`}
-                      {rp.notes && ` - ${rp.notes}`}
-                    </p>
-                  )}
-                </div>
-
-                {/* Panneau étendu — actions */}
-                {isExpanded && activeRoute.status === 'en_cours' && rp.status === 'a_collecter' && (
-                  <div className="bg-gray-50 rounded-b-xl border-x-2 border-b-2 border-gray-200 p-4 -mt-1 space-y-3">
-                    {/* Navigation vers ce point */}
-                    {point?.latitude && (
-                      <button onClick={(e) => { e.stopPropagation(); openNavigation(point.latitude, point.longitude); }}
-                        className="w-full bg-blue-50 text-blue-600 rounded-lg py-2 text-xs font-medium flex items-center justify-center gap-2">
-                        <ExternalLink className="w-3.5 h-3.5" /> Ouvrir dans Google Maps
-                      </button>
-                    )}
-                    {/* Remplissage */}
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Remplissage: {pointFillLevel}%</label>
-                      <input type="range" min="0" max="100" step="10" value={pointFillLevel}
-                        onChange={e => setPointFillLevel(parseInt(e.target.value))} className="w-full accent-soltex-green" />
-                    </div>
-                    {/* Notes */}
-                    <input type="text" placeholder="Notes (optionnel)" value={pointNotes}
-                      onChange={e => setPointNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                    {/* Boutons d'action */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => handleScan(rp.collectionPointId, 'collecte', pointFillLevel, pointNotes)}
-                        className="bg-green-500 text-white rounded-lg py-3 text-sm font-semibold active:scale-95 transition-transform flex flex-col items-center gap-1 col-span-2">
-                        <CheckCircle className="w-5 h-5" /> Collecté
-                      </button>
-                      <button onClick={() => { handleScan(rp.collectionPointId, 'passe', undefined, 'Passé'); }}
-                        className="bg-yellow-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
-                        <AlertCircle className="w-4 h-4" /> Passer
-                      </button>
-                      <button onClick={() => { setShowQrIssue(rp.collectionPointId); setQrIssueReason(''); }}
-                        className="bg-red-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
-                        <AlertTriangle className="w-4 h-4" /> QR indisponible
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Bouton retour centre de tri */}
+        {/* Barre fixe en bas: Scanner QR + Camion plein + Terminer */}
         {activeRoute.status === 'en_cours' && (
-          <button onClick={() => openNavigation(DEPOT.lat, DEPOT.lng)}
-            className="w-full mt-3 bg-gray-100 text-gray-600 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-2">
-            <RotateCcw className="w-4 h-4" /> Retour au centre de tri
-          </button>
-        )}
-
-        {/* Barre d'action en bas */}
-        {activeRoute.status === 'en_cours' && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50">
-            <button onClick={handleFinishRoute}
-              className="w-full bg-red-500 text-white rounded-xl py-3 font-semibold text-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
-              <Square className="w-5 h-5" /> Terminer la tournée ({done}/{total})
-            </button>
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 z-50 safe-area-bottom">
+            <div className="max-w-lg mx-auto flex gap-2">
+              <button onClick={() => { setScanMode(true); setTimeout(() => scanInputRef.current?.focus(), 100); }}
+                className="flex-1 bg-soltex-green text-white rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-bold active:scale-95 transition-transform shadow">
+                <ScanLine className="w-5 h-5" /> Flasher QR
+              </button>
+              <button onClick={() => setShowTruckFull(true)}
+                className="flex-1 bg-amber-500 text-white rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-bold active:scale-95 transition-transform shadow">
+                <Truck className="w-5 h-5" /> Camion plein
+              </button>
+              <button onClick={handleFinishRoute}
+                className="bg-red-500 text-white rounded-xl py-3 px-4 flex items-center justify-center active:scale-95 transition-transform">
+                <Square className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         )}
 
