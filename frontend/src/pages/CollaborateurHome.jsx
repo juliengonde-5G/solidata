@@ -74,12 +74,12 @@ export default function CollaborateurHome() {
 
         {/* Collecte — uniquement pour l'équipe collecte */}
         {isCollecte && (
-          <Link to="/collecte" className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 hover:shadow-lg hover:scale-[1.02] transition-all active:scale-95 border-2 border-transparent hover:border-soltex-green sm:col-span-2">
+          <Link to="/collecte/mobile" className="bg-white rounded-2xl shadow-sm p-6 flex flex-col items-center gap-3 hover:shadow-lg hover:scale-[1.02] transition-all active:scale-95 border-2 border-transparent hover:border-soltex-green sm:col-span-2">
             <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center">
               <Truck className="w-8 h-8 text-orange-600" />
             </div>
             <span className="text-lg font-bold text-gray-700">Mes collectes</span>
-            <span className="text-sm text-gray-400 text-center">Saisir et voir les collectes du jour</span>
+            <span className="text-sm text-gray-400 text-center">Démarrer / suivre mes tournées du jour</span>
           </Link>
         )}
       </div>

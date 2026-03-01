@@ -127,6 +127,9 @@ Collection.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });
 Vehicle.hasMany(Collection, { foreignKey: 'vehicleId', as: 'collections' });
 Collection.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
 
+DailyRoute.hasMany(Collection, { foreignKey: 'dailyRouteId', as: 'collections' });
+Collection.belongsTo(DailyRoute, { foreignKey: 'dailyRouteId', as: 'dailyRoute' });
+
 // === Associations Reporting ===
 CollectionReport.hasMany(RefashionDeclaration, { foreignKey: 'reportId', as: 'declarations' });
 RefashionDeclaration.belongsTo(CollectionReport, { foreignKey: 'reportId', as: 'report' });

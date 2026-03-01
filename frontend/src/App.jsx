@@ -25,6 +25,7 @@ import Collections from './pages/Collection/Collections';
 import MapCAV from './pages/Collection/MapCAV';
 import PlanningCollecte from './pages/Collection/PlanningCollecte';
 import LiveDashboard from './pages/Collection/LiveDashboard';
+import MobileCollecte from './pages/Collection/MobileCollecte';
 import ReportingDashboard from './pages/Reporting/Dashboard';
 import Refashion from './pages/Reporting/Refashion';
 import AdminUsers from './pages/Admin/Users';
@@ -102,6 +103,7 @@ export default function App() {
           <Route path="carte" element={<MapCAV />} />
           <Route path="planning" element={<RoleRoute roles={['admin', 'manager', 'rh']}><PlanningCollecte /></RoleRoute>} />
           <Route path="live" element={<LiveDashboard />} />
+          <Route path="mobile" element={<MobileCollecte />} />
         </Route>
 
         {/* Reporting (admin, manager, rh) */}

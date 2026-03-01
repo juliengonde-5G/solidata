@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../utils/api';
-import { Plus, Weight, Package, Calendar } from 'lucide-react';
+import { Plus, Weight, Package, Calendar, Truck, MapPin } from 'lucide-react';
 
 const STATUS_CONFIG = {
   planifiee: { label: 'Planifiée', color: 'bg-gray-100 text-gray-700' },
@@ -14,6 +14,7 @@ export default function Collections() {
   const [stats, setStats] = useState(null);
   const [routes, setRoutes] = useState([]);
   const [points, setPoints] = useState([]);
+  const [allPoints, setAllPoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [dateRange, setDateRange] = useState(() => {
@@ -60,14 +61,26 @@ export default function Collections() {
     }
   };
 
+  // Charger tous les points quand le formulaire s'ouvre (pour saisie sans tournée)
+  useEffect(() => {
+    if (showForm && allPoints.length === 0) {
+      api.get('/collection/points').then(r => setAllPoints(r.data)).catch(() => {});
+    }
+  }, [showForm]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/collection/collections', {
-        ...form,
+      const payload = {
+        collectionPointId: form.collectionPointId,
+        collectionDate: form.collectionDate,
         weightKg: parseFloat(form.weightKg) || 0,
-        bagsCount: parseInt(form.bagsCount) || 0
-      });
+        bagsCount: parseInt(form.bagsCount) || 0,
+        status: form.status,
+        notes: form.notes
+      };
+      if (form.routeId) payload.routeId = form.routeId;
+      await api.post('/collection/collections', payload);
       setShowForm(false);
       setForm({ routeId: '', collectionPointId: '', collectionDate: new Date().toISOString().slice(0, 10), weightKg: '', bagsCount: '', status: 'terminee', notes: '' });
       fetchData();
@@ -75,6 +88,9 @@ export default function Collections() {
       alert(err.response?.data?.error || 'Erreur');
     }
   };
+
+  // Points à afficher dans le sélecteur : ceux de la tournée ou tous
+  const displayPoints = form.routeId ? points : allPoints;
 
   if (loading) return <div className="text-center py-12 text-gray-500">Chargement...</div>;
 
@@ -134,13 +150,13 @@ export default function Collections() {
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Saisir une collecte</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select required value={form.routeId} onChange={e => onRouteChange(e.target.value)} className="border rounded-lg px-3 py-2">
-              <option value="">Tournée...</option>
+            <select value={form.routeId} onChange={e => onRouteChange(e.target.value)} className="border rounded-lg px-3 py-2">
+              <option value="">Tournée (optionnel)...</option>
               {routes.map(r => <option key={r.id} value={r.id}>{r.name} ({r.sector})</option>)}
             </select>
             <select required value={form.collectionPointId} onChange={e => setForm({...form, collectionPointId: e.target.value})} className="border rounded-lg px-3 py-2">
               <option value="">Point de collecte...</option>
-              {points.map(p => <option key={p.id} value={p.id}>{p.name} - {p.city}</option>)}
+              {displayPoints.map(p => <option key={p.id} value={p.id}>{p.name} - {p.city}</option>)}
             </select>
             <input required type="date" value={form.collectionDate} onChange={e => setForm({...form, collectionDate: e.target.value})} className="border rounded-lg px-3 py-2" />
             <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="border rounded-lg px-3 py-2">
@@ -182,12 +198,18 @@ export default function Collections() {
               <tr key={c.id} className="border-b hover:bg-gray-50">
                 <td className="p-3 text-sm text-gray-600">{new Date(c.collectionDate).toLocaleDateString('fr-FR')}</td>
                 <td className="p-3 text-sm text-gray-600">{c.route?.name || '-'}</td>
-                <td className="p-3 text-sm text-gray-600">{c.collectionPoint?.name || '-'}</td>
+                <td className="p-3 text-sm text-gray-600">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-gray-400" />
+                    {c.collectionPoint?.name || '-'}
+                  </div>
+                  <span className="text-xs text-gray-400">{c.collectionPoint?.city}</span>
+                </td>
                 <td className="p-3 text-sm text-gray-600">{c.employee ? `${c.employee.firstName} ${c.employee.lastName[0]}.` : '-'}</td>
                 <td className="p-3 text-sm text-gray-600 text-right">{c.weightKg ? `${c.weightKg} kg` : '-'}</td>
                 <td className="p-3 text-sm text-gray-600 text-right">{c.bagsCount || '-'}</td>
                 <td className="p-3 text-center">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CONFIG[c.status]?.color}`}>{STATUS_CONFIG[c.status]?.label}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_CONFIG[c.status]?.color || 'bg-gray-100 text-gray-600'}`}>{STATUS_CONFIG[c.status]?.label || c.status}</span>
                 </td>
               </tr>
             ))}

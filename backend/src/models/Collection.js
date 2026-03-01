@@ -8,16 +8,18 @@ const Collection = sequelize.define('Collection', {
     primaryKey: true
   },
   routeId: {
-    type: DataTypes.UUID,
-    allowNull: false
+    type: DataTypes.UUID
   },
   collectionPointId: {
     type: DataTypes.UUID,
     allowNull: false
   },
-  employeeId: {
+  dailyRouteId: {
     type: DataTypes.UUID,
-    allowNull: false
+    comment: 'Lien vers la tournée journalière'
+  },
+  employeeId: {
+    type: DataTypes.UUID
   },
   vehicleId: {
     type: DataTypes.UUID
@@ -35,8 +37,8 @@ const Collection = sequelize.define('Collection', {
     comment: 'Nombre de sacs/bacs collectés'
   },
   status: {
-    type: DataTypes.ENUM('planifiee', 'en_cours', 'terminee', 'annulee'),
-    defaultValue: 'planifiee'
+    type: DataTypes.STRING,
+    defaultValue: 'terminee'
   },
   scannedAt: {
     type: DataTypes.DATE,

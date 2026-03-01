@@ -85,11 +85,13 @@ function getNavSections(role, team) {
     sections.push({
       title: 'Collecte',
       items: [
-        { path: '/collecte', label: 'Collectes', icon: Package },
-        ...(role !== 'collaborateur' ? [
+        ...(role === 'collaborateur' ? [
+          { path: '/collecte/mobile', label: 'Ma tournée', icon: Truck },
+        ] : [
+          { path: '/collecte', label: 'Collectes', icon: Package },
           { path: '/collecte/planning', label: 'Planning', icon: Compass },
           { path: '/collecte/tournees', label: 'Tournées std', icon: Route },
-        ] : []),
+        ]),
         { path: '/collecte/carte', label: 'Carte CAV', icon: Map },
         { path: '/collecte/live', label: 'Suivi live', icon: Radio },
       ]

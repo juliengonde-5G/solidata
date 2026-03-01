@@ -174,6 +174,29 @@ async function start() {
         await sequelize.query(`DROP TYPE IF EXISTS "enum_routes_dayOfWeek"`).catch(() => {});
       }
 
+      // === Migration Collection: ENUM → VARCHAR + nullable ===
+      const [csCol] = await sequelize.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'collections' AND column_name = 'status'
+      `).catch(() => [[]]);
+      if (csCol && csCol.length > 0 && csCol[0].data_type === 'USER-DEFINED') {
+        console.log('Migration Collection.status: ENUM → VARCHAR...');
+        await sequelize.query(`ALTER TABLE collections ALTER COLUMN "status" TYPE VARCHAR(50) USING "status"::text`).catch(() => {});
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_collections_status"`).catch(() => {});
+      }
+      await sequelize.query(`
+        DO $$ BEGIN
+          ALTER TABLE collections ALTER COLUMN "routeId" DROP NOT NULL;
+        EXCEPTION WHEN undefined_table OR undefined_column THEN NULL;
+        END $$;
+      `).catch(() => {});
+      await sequelize.query(`
+        DO $$ BEGIN
+          ALTER TABLE collections ALTER COLUMN "employeeId" DROP NOT NULL;
+        EXCEPTION WHEN undefined_table OR undefined_column THEN NULL;
+        END $$;
+      `).catch(() => {});
+
       // === Migration Vehicle enums: ENUM → VARCHAR ===
       const [vtCol] = await sequelize.query(`
         SELECT data_type FROM information_schema.columns
