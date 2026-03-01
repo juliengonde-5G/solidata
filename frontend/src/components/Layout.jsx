@@ -22,7 +22,8 @@ import {
   PartyPopper,
   Map,
   Radio,
-  Compass
+  Compass,
+  MapPin
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -138,6 +139,7 @@ function getNavSections(role, team) {
       title: 'Administration',
       items: [
         { path: '/admin/utilisateurs', label: 'Utilisateurs', icon: ShieldCheck },
+        { path: '/admin/cav', label: 'Gestion CAV', icon: MapPin },
         { path: '/admin/parametres', label: 'Paramètres', icon: Settings },
       ]
     });
@@ -151,6 +153,7 @@ function getNavSections(role, team) {
         title: 'Ressources Humaines',
         items: [
           { path: '/admin/utilisateurs', label: 'Profils', icon: ShieldCheck },
+          { path: '/admin/cav', label: 'Gestion CAV', icon: MapPin },
         ]
       });
     }

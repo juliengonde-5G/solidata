@@ -164,6 +164,30 @@ async function start() {
         await sequelize.query(`DROP INDEX IF EXISTS "${table}_${column}"`).catch(() => {});
       }
 
+      // === Migration CollectionPoint.type: ENUM → VARCHAR ===
+      const [cpTypeCol] = await sequelize.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'collection_points' AND column_name = 'type'
+      `).catch(() => [[]]);
+      if (cpTypeCol && cpTypeCol.length > 0 && cpTypeCol[0].data_type === 'USER-DEFINED') {
+        console.log('Migration CollectionPoint.type: ENUM → VARCHAR...');
+        await sequelize.query(`ALTER TABLE collection_points ALTER COLUMN "type" TYPE VARCHAR(50) USING "type"::text`).catch(() => {});
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_collection_points_type"`).catch(() => {});
+      }
+
+      // === Migration Employee enums: ENUM → VARCHAR ===
+      const [edCol] = await sequelize.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'employees' AND column_name = 'department'
+      `).catch(() => [[]]);
+      if (edCol && edCol.length > 0 && edCol[0].data_type === 'USER-DEFINED') {
+        console.log('Migration Employee enums → VARCHAR...');
+        await sequelize.query(`ALTER TABLE employees ALTER COLUMN "department" TYPE VARCHAR(50) USING "department"::text`).catch(() => {});
+        await sequelize.query(`ALTER TABLE employees ALTER COLUMN "contractType" TYPE VARCHAR(50) USING "contractType"::text`).catch(() => {});
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_employees_department"`).catch(() => {});
+        await sequelize.query(`DROP TYPE IF EXISTS "enum_employees_contractType"`).catch(() => {});
+      }
+
       // === Migration CollectionPoint: routeId → nullable ===
       await sequelize.query(`
         DO $$ BEGIN

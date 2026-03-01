@@ -31,6 +31,7 @@ import Refashion from './pages/Reporting/Refashion';
 import RapportAutorite from './pages/Reporting/RapportAutorite';
 import AdminUsers from './pages/Admin/Users';
 import AdminSettings from './pages/Admin/Settings';
+import CAVManagement from './pages/Admin/CAVManagement';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -123,6 +124,7 @@ export default function App() {
         {/* Administration (admin + rh pour certaines pages) */}
         <Route path="admin">
           <Route path="utilisateurs" element={<RoleRoute roles={['admin', 'rh']}><AdminUsers /></RoleRoute>} />
+          <Route path="cav" element={<RoleRoute roles={['admin', 'rh']}><CAVManagement /></RoleRoute>} />
           <Route path="parametres" element={<RoleRoute roles={['admin']}><AdminSettings /></RoleRoute>} />
         </Route>
       </Route>

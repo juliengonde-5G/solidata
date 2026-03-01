@@ -3,7 +3,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { Op } = require('sequelize');
 const { authenticate } = require('../../middleware/auth');
-const { CollectionPoint, Route, RouteTemplatePoint } = require('../../models');
+const { CollectionPoint, Route, RouteTemplatePoint, sequelize } = require('../../models');
 
 router.use(authenticate);
 
@@ -141,7 +141,7 @@ router.get('/stale', async (req, res) => {
           { lastCollectionDate: null }
         ]
       },
-      order: [['lastCollectionDate', 'ASC NULLS FIRST']]
+      order: [[sequelize.literal('"lastCollectionDate" ASC NULLS FIRST')]]
     });
     res.json(points);
   } catch (err) {

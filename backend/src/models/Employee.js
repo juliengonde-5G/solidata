@@ -23,11 +23,11 @@ const Employee = sequelize.define('Employee', {
     type: DataTypes.STRING
   },
   department: {
-    type: DataTypes.ENUM('collecte', 'tri', 'logistique', 'boutique', 'administration'),
+    type: DataTypes.STRING,
     allowNull: false
   },
   contractType: {
-    type: DataTypes.ENUM('cddi', 'cdd', 'cdi', 'stage', 'service_civique'),
+    type: DataTypes.STRING,
     allowNull: false
   },
   hireDate: {

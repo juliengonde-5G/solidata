@@ -62,7 +62,7 @@ router.get('/week/:date', async (req, res) => {
 // ============================================================
 // POST /generate/standard — Mode standard (tournées prédéfinies)
 // ============================================================
-router.post('/generate/standard', requireRole('admin', 'manager'), async (req, res) => {
+router.post('/generate/standard', requireRole('admin', 'manager', 'rh'), async (req, res) => {
   try {
     const { date, periods } = req.body; // periods: ['matin'] ou ['matin', 'apres_midi']
     if (!date) return res.status(400).json({ error: 'Date requise' });
@@ -127,7 +127,7 @@ router.post('/generate/standard', requireRole('admin', 'manager'), async (req, r
 // ============================================================
 // POST /generate/intelligent — Mode intelligent (prédictif)
 // ============================================================
-router.post('/generate/intelligent', requireRole('admin', 'manager'), async (req, res) => {
+router.post('/generate/intelligent', requireRole('admin', 'manager', 'rh'), async (req, res) => {
   try {
     const { date, vehicleIds } = req.body;
     if (!date) return res.status(400).json({ error: 'Date requise' });
@@ -149,7 +149,7 @@ router.post('/generate/intelligent', requireRole('admin', 'manager'), async (req
     // Récupérer tous les CAV actifs avec leurs stats
     const allPoints = await CollectionPoint.findAll({
       where: { active: true, latitude: { [Op.ne]: null } },
-      order: [['avgFillRate', 'DESC NULLS LAST']]
+      order: [['name', 'ASC']]
     });
 
     // Calculer un score de priorité pour chaque CAV
@@ -273,7 +273,7 @@ router.post('/generate/intelligent', requireRole('admin', 'manager'), async (req
 // ============================================================
 // POST /generate/manual — Mode manuel (sélection par critères)
 // ============================================================
-router.post('/generate/manual', requireRole('admin', 'manager'), async (req, res) => {
+router.post('/generate/manual', requireRole('admin', 'manager', 'rh'), async (req, res) => {
   try {
     const { date, period, vehicleId, driverId, followerId, criteria, pointIds } = req.body;
     if (!date) return res.status(400).json({ error: 'Date requise' });

@@ -13,7 +13,7 @@ const CollectionPoint = sequelize.define('CollectionPoint', {
     comment: 'Dénomination interne (ex: ROUEN - 27 rue Saint-Sever)'
   },
   type: {
-    type: DataTypes.ENUM('cav', 'decheterie', 'partenaire', 'evenement', 'boite_a_dons'),
+    type: DataTypes.STRING,
     allowNull: false,
     defaultValue: 'cav'
   },
