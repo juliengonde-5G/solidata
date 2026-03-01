@@ -28,6 +28,7 @@ export default function PersonalityResults() {
   const { testId } = useParams();
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [testStatus, setTestStatus] = useState(null);
 
   useEffect(() => {
     async function fetchResults() {
@@ -35,7 +36,17 @@ export default function PersonalityResults() {
         const res = await api.get(`/recruitment/personality/${testId}/results`);
         setResults(res.data);
       } catch (err) {
-        console.error('Fetch results error:', err);
+        // Si test non complété, récupérer le statut pour afficher la progression
+        if (err.response?.status === 400) {
+          try {
+            const statusRes = await api.get(`/recruitment/personality/${testId}/status`);
+            setTestStatus(statusRes.data);
+          } catch (e) {
+            console.error('Status error:', e);
+          }
+        } else {
+          console.error('Fetch results error:', err);
+        }
       } finally {
         setLoading(false);
       }
@@ -44,6 +55,53 @@ export default function PersonalityResults() {
   }, [testId]);
 
   if (loading) return <div className="text-center py-12 text-gray-500">Chargement des résultats...</div>;
+
+  // Test en cours — afficher le statut et le lien vers le questionnaire
+  if (!results && testStatus) {
+    return (
+      <div className="max-w-lg mx-auto mt-12">
+        <Link to="/recrutement" className="flex items-center gap-2 text-soltex-green hover:underline mb-6 text-sm">
+          <ArrowLeft className="w-4 h-4" />
+          Retour aux candidatures
+        </Link>
+        <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+          <Brain className="w-16 h-16 text-purple-300 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Test en cours</h2>
+          <p className="text-gray-500 mb-2">
+            {testStatus.candidateName && `Test de ${testStatus.candidateName} — `}
+            {testStatus.answeredQuestions}/{testStatus.totalQuestions} questions répondues
+          </p>
+          <div className="w-full bg-gray-200 rounded-full h-2 mb-6 mt-4">
+            <div
+              className="bg-purple-500 h-2 rounded-full transition-all"
+              style={{ width: `${(testStatus.answeredQuestions / testStatus.totalQuestions) * 100}%` }}
+            />
+          </div>
+          <div className="flex flex-col gap-3">
+            <a
+              href={`/test-personnalite/${testId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors inline-flex items-center justify-center gap-2"
+            >
+              <Brain className="w-5 h-5" />
+              Ouvrir le questionnaire
+            </a>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/test-personnalite/${testId}`);
+                alert('Lien copié !');
+              }}
+              className="border border-purple-200 text-purple-700 px-6 py-3 rounded-lg font-medium hover:bg-purple-50 transition-colors"
+            >
+              Copier le lien du test
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!results) return <div className="text-center py-12 text-red-500">Résultats non disponibles</div>;
 
   const sortedScores = Object.entries(results.scores)

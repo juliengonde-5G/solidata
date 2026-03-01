@@ -124,10 +124,14 @@ export default function CandidateDetail() {
   const startPersonalityTest = async () => {
     try {
       const res = await api.post(`/recruitment/personality/start/${id}`);
-      navigate(`/recrutement/personnalite/${res.data.testId}`);
+      // Recharger le candidat pour afficher l'état "test en cours" avec le lien
+      const candRes = await api.get(`/recruitment/candidates/${id}`);
+      setCandidate(candRes.data);
     } catch (err) {
       if (err.response?.data?.testId) {
-        navigate(`/recrutement/personnalite/${err.response.data.testId}`);
+        // Test déjà existant — recharger le candidat
+        const candRes = await api.get(`/recruitment/candidates/${id}`);
+        setCandidate(candRes.data);
       } else {
         console.error('Start test error:', err);
       }
