@@ -52,7 +52,13 @@ router.get('/week/:date', async (req, res) => {
       where: { date: { [Op.in]: dates } }
     });
 
-    res.json({ dates, assignments, statuses });
+    // Tous les postes actifs pour la grille
+    const workStations = await WorkStation.findAll({
+      where: { active: true },
+      order: [['group', 'ASC'], ['sortOrder', 'ASC'], ['name', 'ASC']]
+    });
+
+    res.json({ dates, assignments, statuses, workStations });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

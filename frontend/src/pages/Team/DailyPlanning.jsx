@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import api from '../../utils/api';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   Calendar, AlertTriangle, CheckCircle2, Clock, ChevronLeft, ChevronRight,
   Users, Shield, Download, Check, RefreshCw
@@ -70,6 +72,96 @@ export default function DailyPlanning() {
     setDate(d.toISOString().split('T')[0]);
   };
 
+  const handleExportPDF = async () => {
+    try {
+      const res = await api.get(`/team/assignments/week/${date}`);
+      const { dates, assignments: weekAssignments, workStations: wsAll } = res.data;
+
+      // Build assignment lookup: { date_wsId: employeeName }
+      const assignLookup = {};
+      weekAssignments.forEach(a => {
+        const empName = a.employee ? `${a.employee.lastName} ${a.employee.firstName}` : '';
+        assignLookup[`${a.date}_${a.workStationId}`] = empName;
+      });
+
+      // Group workstations
+      const groupedWs = {};
+      (wsAll || []).forEach(ws => {
+        if (!groupedWs[ws.group]) groupedWs[ws.group] = [];
+        groupedWs[ws.group].push(ws);
+      });
+
+      // Day labels for header
+      const dayLabels = dates.map(d => {
+        const dt = new Date(d);
+        return dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+      });
+
+      // Week range label
+      const weekStart = new Date(dates[0]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+      const weekEnd = new Date(dates[dates.length - 1]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Create PDF - A4 landscape for better readability
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+      doc.setFontSize(14);
+      doc.text(`Affectations - Semaine du ${weekStart} au ${weekEnd}`, 14, 15);
+      doc.setFontSize(8);
+      doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 14, 21);
+
+      // Build table rows grouped by category
+      const head = [['Groupe', 'Poste', ...dayLabels]];
+      const body = [];
+
+      Object.entries(groupedWs).forEach(([groupName, stations]) => {
+        stations.forEach((ws, i) => {
+          const row = [
+            i === 0 ? groupName : '',
+            `${ws.name}${ws.mandatory ? ' *' : ''}`,
+            ...dates.map(d => assignLookup[`${d}_${ws.id}`] || '')
+          ];
+          body.push(row);
+        });
+      });
+
+      autoTable(doc, {
+        startY: 25,
+        head,
+        body,
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2, lineColor: [200, 200, 200], lineWidth: 0.2 },
+        headStyles: { fillColor: [76, 140, 74], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+        columnStyles: {
+          0: { cellWidth: 22, fontStyle: 'bold', fontSize: 7 },
+          1: { cellWidth: 38, fontSize: 7 },
+        },
+        didParseCell: (data) => {
+          // Bold mandatory stations
+          if (data.column.index === 1 && data.cell.raw?.includes(' *')) {
+            data.cell.styles.textColor = [180, 40, 40];
+            data.cell.styles.fontStyle = 'bold';
+          }
+          // Gray empty cells
+          if (data.column.index >= 2 && data.section === 'body' && !data.cell.raw) {
+            data.cell.styles.fillColor = [245, 245, 245];
+          }
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Footer note
+      const finalY = doc.lastAutoTable.finalY + 5;
+      doc.setFontSize(7);
+      doc.setTextColor(120, 120, 120);
+      doc.text('* = Poste obligatoire', 14, finalY);
+
+      doc.save(`affectations_semaine_${dates[0]}.pdf`);
+    } catch (err) {
+      console.error('Erreur export PDF:', err);
+      alert('Erreur lors de la génération du PDF');
+    }
+  };
+
   const dateObj = new Date(date);
   const dayLabel = dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
@@ -98,6 +190,9 @@ export default function DailyPlanning() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <h1 className="text-2xl font-bold text-soltex-gray-dark">Affectations du jour</h1>
         <div className="flex items-center gap-2">
+          <button onClick={handleExportPDF} className="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors">
+            <Download className="w-4 h-4" /> PDF semaine
+          </button>
           <button onClick={handleConfirmAll} className="bg-soltex-green hover:bg-soltex-green-dark text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors">
             <Check className="w-4 h-4" /> Confirmer tout
           </button>

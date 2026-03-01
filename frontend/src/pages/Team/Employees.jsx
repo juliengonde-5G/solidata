@@ -46,7 +46,8 @@ export default function Employees() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     department: 'collecte', contractType: 'cddi', hireDate: '',
-    contractEndDate: '', drivingLicense: false, notes: ''
+    contractEndDate: '', drivingLicense: false, caces: false,
+    contractHours: '35h', weeklyDayOff: '', notes: ''
   });
 
   const fetchEmployees = async () => {
@@ -74,7 +75,7 @@ export default function Employees() {
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ firstName: '', lastName: '', email: '', phone: '', department: 'collecte', contractType: 'cddi', hireDate: '', contractEndDate: '', drivingLicense: false, notes: '' });
+      setForm({ firstName: '', lastName: '', email: '', phone: '', department: 'collecte', contractType: 'cddi', hireDate: '', contractEndDate: '', drivingLicense: false, caces: false, contractHours: '35h', weeklyDayOff: '', notes: '' });
       fetchEmployees();
     } catch (err) {
       alert(err.response?.data?.error || 'Erreur');
@@ -86,7 +87,9 @@ export default function Employees() {
       firstName: emp.firstName, lastName: emp.lastName, email: emp.email || '',
       phone: emp.phone || '', department: emp.department, contractType: emp.contractType,
       hireDate: emp.hireDate, contractEndDate: emp.contractEndDate || '',
-      drivingLicense: emp.drivingLicense, notes: emp.notes || ''
+      drivingLicense: emp.drivingLicense, caces: emp.caces || false,
+      contractHours: emp.contractHours || '35h', weeklyDayOff: emp.weeklyDayOff || '',
+      notes: emp.notes || ''
     });
     setEditing(emp.id);
     setShowForm(true);
@@ -145,10 +148,29 @@ export default function Employees() {
               <label className="text-xs text-gray-500">Fin de contrat</label>
               <input type="date" value={form.contractEndDate} onChange={e => setForm({...form, contractEndDate: e.target.value})} className="border rounded-lg px-3 py-2 w-full" />
             </div>
-            <label className="flex items-center gap-2 col-span-full">
-              <input type="checkbox" checked={form.drivingLicense} onChange={e => setForm({...form, drivingLicense: e.target.checked})} />
-              Permis de conduire
-            </label>
+            <div>
+              <label className="text-xs text-gray-500">Heures contrat</label>
+              <select value={form.contractHours} onChange={e => setForm({...form, contractHours: e.target.value})} className="border rounded-lg px-3 py-2 w-full">
+                {['20h', '24h', '26h', '28h', '30h', '32h', '35h'].map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Jour de repos hebdomadaire</label>
+              <select value={form.weeklyDayOff} onChange={e => setForm({...form, weeklyDayOff: e.target.value})} className="border rounded-lg px-3 py-2 w-full">
+                <option value="">Aucun (standard)</option>
+                {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className="col-span-full flex gap-6">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={form.drivingLicense} onChange={e => setForm({...form, drivingLicense: e.target.checked})} />
+                Permis de conduire
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={form.caces} onChange={e => setForm({...form, caces: e.target.checked})} />
+                CACES
+              </label>
+            </div>
             <textarea placeholder="Notes" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="border rounded-lg px-3 py-2 col-span-full" rows={2} />
             <div className="col-span-full flex gap-2">
               <button type="submit" className="bg-soltex-green text-white px-6 py-2 rounded-lg">{editing ? 'Modifier' : 'Ajouter'}</button>
