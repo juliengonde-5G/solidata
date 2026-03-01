@@ -14,6 +14,12 @@ const Collection = require('./Collection');
 const CollectionReport = require('./CollectionReport');
 const RefashionDeclaration = require('./RefashionDeclaration');
 const AppSettings = require('./AppSettings');
+const WorkStation = require('./WorkStation');
+const DailyAssignment = require('./DailyAssignment');
+const EmployeeDayStatus = require('./EmployeeDayStatus');
+const VakEvent = require('./VakEvent');
+const VakWorkStation = require('./VakWorkStation');
+const VakAssignment = require('./VakAssignment');
 
 // === Associations Recrutement ===
 Candidate.belongsTo(JobPosition, { foreignKey: 'jobPositionId', as: 'jobPosition' });
@@ -27,7 +33,6 @@ CandidateHistory.belongsTo(User, { foreignKey: 'changedBy', as: 'changedByUser' 
 Candidate.hasOne(PersonalityTest, { foreignKey: 'candidateId', as: 'personalityTest' });
 PersonalityTest.belongsTo(Candidate, { foreignKey: 'candidateId' });
 
-// Lien candidat → interviewer (User)
 Candidate.belongsTo(User, { foreignKey: 'interviewerId', as: 'interviewer' });
 
 // === Associations Équipe ===
@@ -42,6 +47,28 @@ Planning.belongsTo(Vehicle, { foreignKey: 'vehicleId', as: 'vehicle' });
 
 Route.hasMany(Planning, { foreignKey: 'routeId', as: 'plannings' });
 Planning.belongsTo(Route, { foreignKey: 'routeId', as: 'route' });
+
+// === Associations Affectations quotidiennes ===
+WorkStation.hasMany(DailyAssignment, { foreignKey: 'workStationId', as: 'assignments' });
+DailyAssignment.belongsTo(WorkStation, { foreignKey: 'workStationId', as: 'workStation' });
+
+Employee.hasMany(DailyAssignment, { foreignKey: 'employeeId', as: 'dailyAssignments' });
+DailyAssignment.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });
+
+DailyAssignment.belongsTo(User, { foreignKey: 'confirmedBy', as: 'confirmedByUser' });
+
+Employee.hasMany(EmployeeDayStatus, { foreignKey: 'employeeId', as: 'dayStatuses' });
+EmployeeDayStatus.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });
+
+// === Associations VAK ===
+VakEvent.hasMany(VakAssignment, { foreignKey: 'vakEventId', as: 'assignments' });
+VakAssignment.belongsTo(VakEvent, { foreignKey: 'vakEventId', as: 'vakEvent' });
+
+VakWorkStation.hasMany(VakAssignment, { foreignKey: 'vakWorkStationId', as: 'assignments' });
+VakAssignment.belongsTo(VakWorkStation, { foreignKey: 'vakWorkStationId', as: 'vakWorkStation' });
+
+Employee.hasMany(VakAssignment, { foreignKey: 'employeeId', as: 'vakAssignments' });
+VakAssignment.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employee' });
 
 // === Associations Collecte ===
 Route.hasMany(CollectionPoint, { foreignKey: 'routeId', as: 'points' });
@@ -79,5 +106,11 @@ module.exports = {
   Collection,
   CollectionReport,
   RefashionDeclaration,
-  AppSettings
+  AppSettings,
+  WorkStation,
+  DailyAssignment,
+  EmployeeDayStatus,
+  VakEvent,
+  VakWorkStation,
+  VakAssignment
 };

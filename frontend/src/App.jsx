@@ -13,8 +13,12 @@ import Positions from './pages/Recruitment/Positions';
 import PersonalityQuiz from './pages/Recruitment/PersonalityQuiz';
 import PersonalityResults from './pages/Recruitment/PersonalityResults';
 import Employees from './pages/Team/Employees';
+import EmployeeDetail from './pages/Team/EmployeeDetail';
 import Vehicles from './pages/Team/Vehicles';
 import PlanningPage from './pages/Team/Planning';
+import DailyPlanning from './pages/Team/DailyPlanning';
+import WorkStations from './pages/Team/WorkStations';
+import VakModule from './pages/Team/VakModule';
 import RoutesPage from './pages/Collection/Routes';
 import RouteDetail from './pages/Collection/RouteDetail';
 import Collections from './pages/Collection/Collections';
@@ -79,8 +83,12 @@ export default function App() {
         {/* Équipe (admin, manager, rh) */}
         <Route path="equipe">
           <Route index element={<RoleRoute roles={['admin', 'manager', 'rh']}><Employees /></RoleRoute>} />
+          <Route path="salarie/:id" element={<RoleRoute roles={['admin', 'manager', 'rh']}><EmployeeDetail /></RoleRoute>} />
           <Route path="vehicules" element={<RoleRoute roles={['admin', 'manager', 'rh']}><Vehicles /></RoleRoute>} />
           <Route path="planning" element={<RoleRoute roles={['admin', 'manager', 'rh']}><PlanningPage /></RoleRoute>} />
+          <Route path="affectations" element={<RoleRoute roles={['admin', 'manager', 'rh']}><DailyPlanning /></RoleRoute>} />
+          <Route path="postes-travail" element={<RoleRoute roles={['admin', 'manager', 'rh']}><WorkStations /></RoleRoute>} />
+          <Route path="vak" element={<RoleRoute roles={['admin', 'manager', 'rh']}><VakModule /></RoleRoute>} />
         </Route>
 
         {/* Collecte (admin, manager, rh + collaborateur collecte) */}

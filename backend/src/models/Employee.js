@@ -45,6 +45,17 @@ const Employee = sequelize.define('Employee', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
+  caces: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  weeklyDayOff: {
+    type: DataTypes.STRING
+  },
+  contractHours: {
+    type: DataTypes.STRING,
+    defaultValue: '35h'
+  },
   notes: {
     type: DataTypes.TEXT
   }

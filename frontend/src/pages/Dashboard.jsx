@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
-import { Users, Briefcase, CheckCircle, Clock } from 'lucide-react';
+import { Users, Briefcase, CheckCircle, Clock, AlertTriangle, ClipboardList, Shield } from 'lucide-react';
 
 const STATUS_LABELS = {
   candidature_recue: 'Candidatures reçues',
@@ -13,14 +13,17 @@ const STATUS_LABELS = {
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [assignmentStats, setAssignmentStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchStats() {
       try {
-        const [candidatesRes, positionsRes] = await Promise.all([
+        const today = new Date().toISOString().split('T')[0];
+        const [candidatesRes, positionsRes, assignStatsRes] = await Promise.all([
           api.get('/recruitment/candidates/kanban'),
-          api.get('/recruitment/positions')
+          api.get('/recruitment/positions'),
+          api.get(`/team/assignments/stats/${today}`).catch(() => ({ data: null }))
         ]);
 
         const kanban = candidatesRes.data;
@@ -37,6 +40,7 @@ export default function Dashboard() {
           openPositions: positions.reduce((sum, p) => sum + (p.openPositions - p.filledPositions), 0),
           recentCandidates: kanban.candidature_recue?.slice(0, 5) || []
         });
+        setAssignmentStats(assignStatsRes.data);
       } catch (err) {
         console.error('Dashboard error:', err);
       } finally {
@@ -58,7 +62,26 @@ export default function Dashboard() {
     <div>
       <h1 className="text-2xl font-bold text-soltex-gray-dark mb-6">Tableau de bord</h1>
 
-      {/* KPIs */}
+      {/* Alerte affectations */}
+      {assignmentStats?.mandatoryMissing?.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-2 text-red-700 font-semibold text-sm mb-2">
+            <AlertTriangle className="w-4 h-4" /> Postes obligatoires non affectés aujourd'hui
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {assignmentStats.mandatoryMissing.map(s => (
+              <span key={s.id} className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                {s.name}
+              </span>
+            ))}
+          </div>
+          <Link to="/equipe/affectations" className="text-red-600 text-xs hover:underline mt-2 inline-block">
+            Voir les affectations
+          </Link>
+        </div>
+      )}
+
+      {/* KPIs Recrutement + Affectations */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="flex items-center gap-3">
@@ -67,7 +90,7 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-800">{stats.totalCandidates}</p>
-              <p className="text-sm text-gray-500">Candidatures totales</p>
+              <p className="text-sm text-gray-500">Candidatures</p>
             </div>
           </div>
         </div>
@@ -84,33 +107,65 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-6 h-6 text-purple-600" />
+        {assignmentStats && (
+          <>
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <ClipboardList className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-800">{assignmentStats.filledStations}/{assignmentStats.totalStations}</p>
+                  <p className="text-sm text-gray-500">Postes pourvus</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">
-                {stats.byStatus.find(s => s.status === 'convoque')?.count || 0}
-              </p>
-              <p className="text-sm text-gray-500">Convoqués</p>
-            </div>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${assignmentStats.mandatoryMissing?.length ? 'bg-red-100' : 'bg-green-100'}`}>
+                  <Shield className={`w-6 h-6 ${assignmentStats.mandatoryMissing?.length ? 'text-red-600' : 'text-green-600'}`} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-800">{assignmentStats.mandatoryFilled}/{assignmentStats.mandatoryTotal}</p>
+                  <p className="text-sm text-gray-500">Obligatoires pourvus</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">
-                {stats.byStatus.find(s => s.status === 'recrute')?.count || 0}
-              </p>
-              <p className="text-sm text-gray-500">Recrutés</p>
+          </>
+        )}
+
+        {!assignmentStats && (
+          <>
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-800">
+                    {stats.byStatus.find(s => s.status === 'convoque')?.count || 0}
+                  </p>
+                  <p className="text-sm text-gray-500">Convoqués</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-800">
+                    {stats.byStatus.find(s => s.status === 'recrute')?.count || 0}
+                  </p>
+                  <p className="text-sm text-gray-500">Recrutés</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Pipeline */}

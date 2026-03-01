@@ -22,6 +22,9 @@ const personalityRoutes = require('./routes/recruitment/personality');
 const employeesRoutes = require('./routes/team/employees');
 const vehiclesRoutes = require('./routes/team/vehicles');
 const planningRoutes = require('./routes/team/planning');
+const workstationsRoutes = require('./routes/team/workstations');
+const dailyAssignmentsRoutes = require('./routes/team/daily-assignments');
+const vakRoutes = require('./routes/team/vak');
 
 // Routes Collecte
 const collectionRoutesRoutes = require('./routes/collection/routes');
@@ -60,6 +63,9 @@ app.use('/api/recruitment/personality', personalityRoutes);
 app.use('/api/team/employees', employeesRoutes);
 app.use('/api/team/vehicles', vehiclesRoutes);
 app.use('/api/team/planning', planningRoutes);
+app.use('/api/team/workstations', workstationsRoutes);
+app.use('/api/team/assignments', dailyAssignmentsRoutes);
+app.use('/api/team/vak', vakRoutes);
 
 // Routes API - Collecte
 app.use('/api/collection/routes', collectionRoutesRoutes);

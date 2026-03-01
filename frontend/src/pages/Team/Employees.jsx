@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../utils/api';
-import { Plus, Edit2, ChevronDown, ChevronUp, Award } from 'lucide-react';
+import { Plus, Edit2, ChevronDown, ChevronUp, Award, Calendar } from 'lucide-react';
 
 const DEPARTMENTS = [
   { value: 'collecte', label: 'Collecte' },
@@ -173,7 +174,11 @@ export default function Employees() {
               </div>
               <div className="flex items-center gap-2">
                 {emp.drivingLicense && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Permis</span>}
+                {emp.caces && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">CACES</span>}
                 <span className="text-xs text-gray-400">{emp.skills?.length || 0} comp.</span>
+                <Link to={`/equipe/salarie/${emp.id}`} onClick={e => e.stopPropagation()} className="text-gray-400 hover:text-blue-500" title="Fiche & calendrier">
+                  <Calendar className="w-4 h-4" />
+                </Link>
                 <button onClick={(e) => { e.stopPropagation(); startEdit(emp); }} className="text-gray-400 hover:text-soltex-green">
                   <Edit2 className="w-4 h-4" />
                 </button>

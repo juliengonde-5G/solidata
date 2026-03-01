@@ -16,7 +16,10 @@ import {
   LogOut,
   Menu,
   X,
-  User
+  User,
+  ClipboardList,
+  Shield,
+  PartyPopper
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -65,6 +68,9 @@ function getNavSections(role, team) {
       title: 'Équipe',
       items: [
         { path: '/equipe', label: 'Salariés', icon: UserCheck },
+        { path: '/equipe/affectations', label: 'Affectations', icon: ClipboardList },
+        { path: '/equipe/postes-travail', label: 'Postes de travail', icon: Shield },
+        { path: '/equipe/vak', label: 'VAK', icon: PartyPopper },
         { path: '/equipe/vehicules', label: 'Véhicules', icon: Truck },
         { path: '/equipe/planning', label: 'Planning', icon: CalendarDays },
       ]
