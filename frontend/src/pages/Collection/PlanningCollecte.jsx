@@ -19,8 +19,17 @@ const SOURCE_LABELS = {
   manuel: { label: 'Manuel', icon: Hand, color: 'bg-amber-50 text-amber-700' },
 };
 
+// Prochain jour ouvré (demain ou lundi si vendredi/samedi/dimanche)
+function nextBusinessDay() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0];
+}
+
 export default function PlanningCollecte() {
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [genDate, setGenDate] = useState(nextBusinessDay);
   const [weekData, setWeekData] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -29,6 +38,9 @@ export default function PlanningCollecte() {
   const [activeTab, setActiveTab] = useState('week'); // week, generate
   const [genMode, setGenMode] = useState('standard');
   const [genResult, setGenResult] = useState(null);
+  // Standard mode: available templates
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplates, setSelectedTemplates] = useState([]);
   // Manual mode criteria
   const [criteria, setCriteria] = useState({ cities: [], daysSinceCollection: 7, minFillRate: '' });
   const [criteriaOptions, setCriteriaOptions] = useState({ cities: [], communautes: [] });
@@ -53,6 +65,7 @@ export default function PlanningCollecte() {
   useEffect(() => { setLoading(true); fetchWeek(); }, [fetchWeek]);
   useEffect(() => {
     api.get('/collection/planning/criteria-options').then(r => setCriteriaOptions(r.data)).catch(() => {});
+    api.get('/collection/routes').then(r => setTemplates(r.data.filter(t => t.active !== false))).catch(() => {});
   }, []);
 
   const changeWeek = (offset) => {
@@ -67,11 +80,14 @@ export default function PlanningCollecte() {
     try {
       let res;
       if (genMode === 'standard') {
-        res = await api.post('/collection/planning/generate/standard', { date });
+        res = await api.post('/collection/planning/generate/standard', {
+          date: genDate,
+          templateIds: selectedTemplates.length > 0 ? selectedTemplates : undefined
+        });
       } else if (genMode === 'intelligent') {
-        res = await api.post('/collection/planning/generate/intelligent', { date });
+        res = await api.post('/collection/planning/generate/intelligent', { date: genDate });
       } else {
-        res = await api.post('/collection/planning/generate/manual', { date, criteria });
+        res = await api.post('/collection/planning/generate/manual', { date: genDate, criteria });
       }
       setGenResult(res.data);
       fetchWeek();
@@ -175,8 +191,9 @@ export default function PlanningCollecte() {
                   {dayRoutes.map(route => {
                     const src = SOURCE_LABELS[route.source] || SOURCE_LABELS.standard;
                     const SrcIcon = src.icon;
+                    const isConfirmed = route.vehicleId && route.driverId;
                     return (
-                      <div key={route.id} className="px-4 py-3 flex items-center gap-4 flex-wrap">
+                      <div key={route.id} className={`px-4 py-3 flex items-center gap-4 flex-wrap ${isConfirmed ? '' : 'bg-gray-50/50'}`}>
                         {/* Source badge */}
                         <div className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${src.color}`}>
                           <SrcIcon className="w-3 h-3" /> {src.label}
@@ -188,7 +205,7 @@ export default function PlanningCollecte() {
                         </span>
 
                         {/* Template */}
-                        <span className="text-sm font-medium text-gray-800 min-w-[150px]">
+                        <span className={`text-sm min-w-[150px] ${isConfirmed ? 'font-bold text-gray-900' : 'italic text-gray-500'}`}>
                           {route.templateRoute?.name || 'Tournée libre'}
                         </span>
 
@@ -197,24 +214,41 @@ export default function PlanningCollecte() {
                           <MapPin className="w-3 h-3" /> {route.routePoints?.length || 0} pts
                         </span>
 
-                        {/* Vehicle */}
-                        <select value={route.vehicleId || ''} onChange={e => handleAssign(route.id, 'vehicleId', e.target.value)}
-                          className="border rounded px-2 py-1 text-xs min-w-[130px]">
-                          <option value="">-- Véhicule --</option>
-                          {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.licensePlate})</option>)}
-                        </select>
+                        {/* Affectations */}
+                        <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+                          {/* Vehicle */}
+                          <div className="flex items-center gap-1 flex-1">
+                            <Truck className={`w-3.5 h-3.5 ${route.vehicleId ? 'text-soltex-green' : 'text-gray-300'}`} />
+                            <select value={route.vehicleId || ''} onChange={e => handleAssign(route.id, 'vehicleId', e.target.value)}
+                              className={`border rounded px-2 py-1 text-xs flex-1 ${route.vehicleId ? 'font-semibold border-soltex-green/30' : 'italic text-gray-400 border-dashed'}`}>
+                              <option value="">-- Véhicule --</option>
+                              {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.licensePlate})</option>)}
+                            </select>
+                          </div>
 
-                        {/* Driver */}
-                        <select value={route.driverId || ''} onChange={e => handleAssign(route.id, 'driverId', e.target.value)}
-                          className="border rounded px-2 py-1 text-xs min-w-[130px]">
-                          <option value="">-- Chauffeur --</option>
-                          {employees.map(e => <option key={e.id} value={e.id}>{e.lastName} {e.firstName}</option>)}
-                        </select>
+                          {/* Driver */}
+                          <div className="flex items-center gap-1 flex-1">
+                            <Users className={`w-3.5 h-3.5 ${route.driverId ? 'text-soltex-green' : 'text-gray-300'}`} />
+                            <select value={route.driverId || ''} onChange={e => handleAssign(route.id, 'driverId', e.target.value)}
+                              className={`border rounded px-2 py-1 text-xs flex-1 ${route.driverId ? 'font-semibold border-soltex-green/30' : 'italic text-gray-400 border-dashed'}`}>
+                              <option value="">-- Chauffeur --</option>
+                              {employees.map(e => <option key={e.id} value={e.id}>{e.lastName} {e.firstName}</option>)}
+                            </select>
+                          </div>
+                        </div>
 
                         {/* Status */}
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[route.status]}`}>
                           {route.status}
                         </span>
+
+                        {/* Confirmed indicator */}
+                        {isConfirmed && (
+                          <span className="text-[10px] text-green-600 font-bold">Confirmée</span>
+                        )}
+                        {!isConfirmed && (
+                          <span className="text-[10px] text-gray-400 italic">Provisoire</span>
+                        )}
 
                         {/* Actions */}
                         {route.status === 'planifiee' && (
@@ -244,12 +278,21 @@ export default function PlanningCollecte() {
 
       {activeTab === 'generate' && (
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-4">Générer des tournées pour le {new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
+          {/* Date de génération */}
+          <div className="flex items-center gap-4 mb-6">
+            <h2 className="text-lg font-semibold">Générer des tournées pour le</h2>
+            <input type="date" value={genDate} onChange={e => setGenDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              className="text-lg font-semibold border rounded-lg px-3 py-1 bg-soltex-green/5 border-soltex-green/30" />
+            <span className="text-sm text-gray-500">
+              {new Date(genDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </span>
+          </div>
 
           {/* Mode selector */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             {[
-              { val: 'standard', icon: Cog, label: 'Standard', desc: 'Tournées prédéfinies selon le jour de la semaine' },
+              { val: 'standard', icon: Cog, label: 'Standard', desc: 'Choisir parmi les tournées prédéfinies' },
               { val: 'intelligent', icon: Zap, label: 'Intelligent', desc: 'Optimisé selon remplissage, fréquence et géographie' },
               { val: 'manuel', icon: Hand, label: 'Manuel', desc: 'Sélection par zone géographique ou critères' },
             ].map(m => (
@@ -264,6 +307,39 @@ export default function PlanningCollecte() {
               </button>
             ))}
           </div>
+
+          {/* Standard mode: template selector */}
+          {genMode === 'standard' && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-sm">Tournées standard disponibles</h3>
+                <button type="button"
+                  onClick={() => setSelectedTemplates(selectedTemplates.length === templates.length ? [] : templates.map(t => t.id))}
+                  className="text-xs text-soltex-green hover:underline">
+                  {selectedTemplates.length === templates.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                {templates.map(t => (
+                  <label key={t.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                    selectedTemplates.includes(t.id) ? 'bg-soltex-green/10 border border-soltex-green/30' : 'bg-white border border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input type="checkbox" checked={selectedTemplates.includes(t.id)}
+                      onChange={e => {
+                        if (e.target.checked) setSelectedTemplates([...selectedTemplates, t.id]);
+                        else setSelectedTemplates(selectedTemplates.filter(id => id !== t.id));
+                      }}
+                      className="accent-soltex-green" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-700 truncate">{t.name}</div>
+                      <div className="text-xs text-gray-400">{t.points?.length || 0} pts - {t.sector || 'Pas de secteur'}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {templates.length === 0 && <p className="text-sm text-gray-400">Aucune tournée standard configurée</p>}
+            </div>
+          )}
 
           {/* Manual mode criteria */}
           {genMode === 'manuel' && (

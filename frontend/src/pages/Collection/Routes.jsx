@@ -4,6 +4,7 @@ import api from '../../utils/api';
 import { Plus, MapPin, Clock, Route as RouteIcon } from 'lucide-react';
 
 const DAYS = {
+  '': '-- Aucun jour fixe --',
   lundi: 'Lundi', mardi: 'Mardi', mercredi: 'Mercredi',
   jeudi: 'Jeudi', vendredi: 'Vendredi', samedi: 'Samedi'
 };
@@ -19,7 +20,7 @@ export default function RoutesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
-    name: '', sector: '', dayOfWeek: 'lundi', estimatedDuration: 0,
+    name: '', sector: '', dayOfWeek: '', estimatedDuration: 0,
     estimatedDistance: 0, vehicleType: 'camion_20m3', notes: ''
   });
 
@@ -46,7 +47,7 @@ export default function RoutesPage() {
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: '', sector: '', dayOfWeek: 'lundi', estimatedDuration: 0, estimatedDistance: 0, vehicleType: 'camion_20m3', notes: '' });
+      setForm({ name: '', sector: '', dayOfWeek: '', estimatedDuration: 0, estimatedDistance: 0, vehicleType: 'camion_20m3', notes: '' });
       fetchRoutes();
     } catch (err) {
       alert(err.response?.data?.error || 'Erreur');
@@ -79,10 +80,13 @@ export default function RoutesPage() {
           <h2 className="text-lg font-semibold mb-4">{editing ? 'Modifier' : 'Nouvelle tournée'}</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input required placeholder="Nom de la tournée" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <input required placeholder="Secteur (ex: Bordeaux Nord)" value={form.sector} onChange={e => setForm({...form, sector: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <select required value={form.dayOfWeek} onChange={e => setForm({...form, dayOfWeek: e.target.value})} className="border rounded-lg px-3 py-2">
-              {Object.entries(DAYS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
+            <input placeholder="Secteur (ex: Rouen Rive Droite)" value={form.sector} onChange={e => setForm({...form, sector: e.target.value})} className="border rounded-lg px-3 py-2" />
+            <div>
+              <label className="text-xs text-gray-500">Jour habituel (optionnel)</label>
+              <select value={form.dayOfWeek || ''} onChange={e => setForm({...form, dayOfWeek: e.target.value || null})} className="border rounded-lg px-3 py-2 w-full">
+                {Object.entries(DAYS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
             <select value={form.vehicleType} onChange={e => setForm({...form, vehicleType: e.target.value})} className="border rounded-lg px-3 py-2">
               {Object.entries(VEHICLE_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
@@ -112,7 +116,7 @@ export default function RoutesPage() {
                 <RouteIcon className="w-5 h-5 text-soltex-green" />
                 <h3 className="font-semibold text-gray-700">{r.name}</h3>
               </div>
-              <span className="text-xs bg-soltex-green/10 text-soltex-green px-2 py-0.5 rounded-full">{DAYS[r.dayOfWeek]}</span>
+              {r.dayOfWeek && <span className="text-xs bg-soltex-green/10 text-soltex-green px-2 py-0.5 rounded-full">{DAYS[r.dayOfWeek]}</span>}
             </div>
             <div className="space-y-1 text-sm text-gray-500">
               <p className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {r.sector}</p>

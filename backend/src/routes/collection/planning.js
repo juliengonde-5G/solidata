@@ -64,16 +64,17 @@ router.get('/week/:date', async (req, res) => {
 // ============================================================
 router.post('/generate/standard', requireRole('admin', 'manager', 'rh'), async (req, res) => {
   try {
-    const { date, periods } = req.body; // periods: ['matin'] ou ['matin', 'apres_midi']
+    const { date, periods, templateIds } = req.body;
     if (!date) return res.status(400).json({ error: 'Date requise' });
 
-    const dateObj = new Date(date);
-    const dayNames = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-    const dayName = dayNames[dateObj.getDay()];
+    // Sélection par IDs fournis, sinon toutes les tournées actives
+    const where = { active: true };
+    if (templateIds && templateIds.length > 0) {
+      where.id = { [Op.in]: templateIds };
+    }
 
-    // Trouver les tournées standard pour ce jour
     const templates = await Route.findAll({
-      where: { active: true, dayOfWeek: dayName },
+      where,
       include: [{
         model: RouteTemplatePoint, as: 'templatePoints',
         include: [{ model: CollectionPoint, as: 'collectionPoint' }],
@@ -82,15 +83,14 @@ router.post('/generate/standard', requireRole('admin', 'manager', 'rh'), async (
     });
 
     if (templates.length === 0) {
-      return res.json({ created: 0, message: `Pas de tournée standard pour ${dayName}` });
+      return res.json({ created: 0, message: 'Aucune tournée standard sélectionnée' });
     }
 
     // Vérifier qu'aucune tournée n'existe déjà pour ce jour
     const existing = await DailyRoute.findAll({ where: { date } });
-    const existingTemplateIds = new Set(existing.map(r => r.templateRouteId));
 
     const created = [];
-    const activePeriods = periods || ['matin', 'apres_midi'];
+    const activePeriods = periods || ['matin'];
 
     for (const template of templates) {
       for (const period of activePeriods) {

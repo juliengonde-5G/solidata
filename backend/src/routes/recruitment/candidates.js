@@ -196,10 +196,11 @@ router.put('/:id', authenticate, upload.single('cv'), async (req, res) => {
     }
 
     // Si changement de statut → historiser
-    if (updateData.status && updateData.status !== candidate.status) {
+    const previousStatus = candidate.status;
+    if (updateData.status && updateData.status !== previousStatus) {
       await CandidateHistory.create({
         candidateId: candidate.id,
-        fromStatus: candidate.status,
+        fromStatus: previousStatus,
         toStatus: updateData.status,
         changedBy: req.user.id,
         comment: updateData.statusComment || ''
@@ -208,6 +209,16 @@ router.put('/:id', authenticate, upload.single('cv'), async (req, res) => {
 
     delete updateData.statusComment;
     await candidate.update(updateData);
+
+    // Mettre à jour le compteur de postes pourvus
+    const positionId = candidate.jobPositionId;
+    if (positionId) {
+      if (updateData.status === 'recrute' && previousStatus !== 'recrute') {
+        await JobPosition.increment('filledPositions', { where: { id: positionId } });
+      } else if (previousStatus === 'recrute' && updateData.status && updateData.status !== 'recrute') {
+        await JobPosition.decrement('filledPositions', { where: { id: positionId } });
+      }
+    }
 
     const updated = await Candidate.findByPk(candidate.id, {
       include: [

@@ -37,13 +37,18 @@ export default function MobileCollecte() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Charger les tournées du jour
+  // Charger les tournées du jour (filtrées pour le chauffeur connecté)
   const fetchRoutes = async () => {
     try {
       const { data } = await api.get(`/collection/daily-routes/day/${today}`);
-      setRoutes(data);
+      // Filtrer : montrer les tournées assignées au chauffeur connecté, ou toutes si admin/manager
+      const isManager = user && ['admin', 'manager', 'rh'].includes(user.role);
+      const myRoutes = isManager ? data : data.filter(r =>
+        !r.driverId || r.driverId === user?.employeeId || r.driver?.id === user?.employeeId
+      );
+      setRoutes(myRoutes);
       // Si une tournée est en cours, la sélectionner automatiquement
-      const enCours = data.find(r => r.status === 'en_cours');
+      const enCours = myRoutes.find(r => r.status === 'en_cours');
       if (enCours) {
         loadRouteDetail(enCours.id);
       }

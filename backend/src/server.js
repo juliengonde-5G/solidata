@@ -372,6 +372,141 @@ async function start() {
       console.warn('Auto-import CAV ignoré:', seedErr.message);
     }
 
+    // === Auto-import historique tonnages depuis tonnages.xlsx ===
+    try {
+      const { WeightRecord } = require('./models');
+      const wrCount = await WeightRecord.count();
+      if (wrCount === 0) {
+        const fs = require('fs');
+        const XLSX = require('xlsx');
+        const dataDir = fs.existsSync('/app/data') ? '/app/data' : path.join(__dirname, '../..', 'data');
+        let tonnagesPath = path.join(dataDir, 'tonnages.xlsx');
+        if (!fs.existsSync(tonnagesPath)) tonnagesPath = path.join(__dirname, '../..', 'tonnages.xlsx');
+        if (fs.existsSync(tonnagesPath)) {
+          console.log('Import automatique des tonnages depuis le fichier Excel...');
+          const wb = XLSX.readFile(tonnagesPath);
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+          const records = [];
+          for (let i = 9; i < data.length; i++) {
+            const row = data[i];
+            if (!row || !row[1]) continue;
+            const externalId = String(row[1]);
+            const origine = row[2] || null;
+            const categorie = row[3] || null;
+            const poidsNet = row[4] ? parseInt(row[4]) : null;
+            const tare = row[6] ? parseInt(row[6]) : null;
+            const poidsBrut = row[7] ? parseInt(row[7]) : null;
+            // Date Excel → JS date
+            let weighedAt = null;
+            if (row[8] && typeof row[8] === 'number') {
+              weighedAt = new Date((row[8] - 25569) * 86400 * 1000);
+            }
+            const mois = row[10] ? parseInt(row[10]) : null;
+            const trimestre = row[11] || null;
+            const annee = row[12] ? parseInt(row[12]) : null;
+
+            records.push({
+              externalId, origine, categorie, poidsNet, tare, poidsBrut,
+              weighedAt, mois, trimestre, annee
+            });
+          }
+
+          // Bulk insert par lots de 500
+          for (let j = 0; j < records.length; j += 500) {
+            await WeightRecord.bulkCreate(records.slice(j, j + 500));
+          }
+          console.log(`${records.length} enregistrements de tonnage importés depuis Excel`);
+        }
+      }
+    } catch (tonErr) {
+      console.warn('Auto-import tonnages ignoré:', tonErr.message);
+    }
+
+    // === Auto-import des tournées standard depuis tournee.xlsx ===
+    try {
+      const { Route: RouteModel, RouteTemplatePoint, CollectionPoint: CP } = require('./models');
+      const routeCount = await RouteModel.count();
+      if (routeCount === 0) {
+        const fs = require('fs');
+        const XLSX = require('xlsx');
+        const dataDir = fs.existsSync('/app/data') ? '/app/data' : path.join(__dirname, '../..', 'data');
+        // Chercher tournee.xlsx dans data/ ou racine
+        let xlsPath = path.join(dataDir, 'tournee.xlsx');
+        if (!fs.existsSync(xlsPath)) xlsPath = path.join(__dirname, '../..', 'tournee.xlsx');
+        if (fs.existsSync(xlsPath)) {
+          console.log('Import automatique des tournées standard depuis le fichier Excel...');
+          const wb = XLSX.readFile(xlsPath);
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+          // Row 2: route names in cols 22-40
+          const routeNames = data[2] || [];
+          // Row 4: default day of week per route
+          const routeDayRow = data[4] || [];
+          // Map short day names to full
+          const dayMap = { 'Lun': 'lundi', 'Mar': 'mardi', 'Mer': 'mercredi', 'Jeu': 'jeudi', 'Ven': 'vendredi', 'Sam': 'samedi' };
+
+          // Build route definitions
+          const routeDefs = [];
+          for (let col = 22; col <= 50; col++) {
+            const name = routeNames[col];
+            if (!name || !name.trim() || name.trim() === ' ') continue;
+            const dayShort = routeDayRow[col];
+            routeDefs.push({ col, name: name.trim(), dayOfWeek: dayMap[dayShort] || null });
+          }
+
+          // Get all collection points for matching by name
+          const allCPs = await CP.findAll({ attributes: ['id', 'name'] });
+          const cpByName = {};
+          allCPs.forEach(cp => { cpByName[cp.name.toUpperCase().trim()] = cp.id; });
+
+          let importedRoutes = 0;
+          for (const rd of routeDefs) {
+            // Find member CAVs: rows 5+ where column has a value
+            const members = [];
+            for (let row = 5; row < data.length; row++) {
+              const val = data[row]?.[rd.col];
+              if (val && val !== '' && val !== ' ') {
+                const cavName = data[row]?.[1];
+                if (cavName) {
+                  // Match CAV name to collection point
+                  const cpId = cpByName[cavName.toUpperCase().trim()];
+                  if (cpId) members.push(cpId);
+                }
+              }
+            }
+
+            // Create the route template (no dayOfWeek assignment per user request)
+            const route = await RouteModel.create({
+              name: rd.name,
+              sector: rd.name,
+              dayOfWeek: null, // Not tied to a specific day
+              vehicleType: 'camion_20m3',
+              active: true,
+              notes: `Importé depuis Excel - ${members.length} CAV`
+            });
+
+            // Create template points
+            if (members.length > 0) {
+              await RouteTemplatePoint.bulkCreate(
+                members.map((cpId, idx) => ({
+                  routeId: route.id,
+                  collectionPointId: cpId,
+                  sortOrder: idx
+                }))
+              );
+            }
+            importedRoutes++;
+          }
+          console.log(`${importedRoutes} tournées standard importées depuis Excel`);
+        }
+      }
+    } catch (routeErr) {
+      console.warn('Auto-import tournées ignoré:', routeErr.message);
+    }
+
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Solidata API démarrée sur le port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);

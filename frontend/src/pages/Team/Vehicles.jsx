@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../utils/api';
-import { Plus, Truck, Wrench } from 'lucide-react';
+import { Plus, Truck } from 'lucide-react';
 
 const VEHICLE_TYPES = [
   { value: 'camion_20m3', label: 'Camion 20m3', capacity: 20 },
@@ -23,7 +23,7 @@ export default function Vehicles() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
     name: '', licensePlate: '', type: 'camion_20m3', capacity: 20,
-    status: 'disponible', mileage: 0, lastMaintenanceDate: '', nextMaintenanceDate: ''
+    status: 'disponible', mileage: 0
   });
 
   const fetchVehicles = async () => {
@@ -49,7 +49,7 @@ export default function Vehicles() {
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: '', licensePlate: '', type: 'camion_20m3', capacity: 20, status: 'disponible', mileage: 0, lastMaintenanceDate: '', nextMaintenanceDate: '' });
+      setForm({ name: '', licensePlate: '', type: 'camion_20m3', capacity: 20, status: 'disponible', mileage: 0 });
       fetchVehicles();
     } catch (err) {
       alert(err.response?.data?.error || 'Erreur');
@@ -59,8 +59,7 @@ export default function Vehicles() {
   const startEdit = (v) => {
     setForm({
       name: v.name, licensePlate: v.licensePlate, type: v.type, capacity: v.capacity || 0,
-      status: v.status, mileage: v.mileage || 0,
-      lastMaintenanceDate: v.lastMaintenanceDate || '', nextMaintenanceDate: v.nextMaintenanceDate || ''
+      status: v.status, mileage: v.mileage || 0
     });
     setEditing(v.id);
     setShowForm(true);
@@ -97,14 +96,6 @@ export default function Vehicles() {
               <label className="text-xs text-gray-500">Capacité (m3)</label>
               <input type="number" step="0.1" value={form.capacity} onChange={e => setForm({...form, capacity: parseFloat(e.target.value) || 0})} className="border rounded-lg px-3 py-2 w-full" />
             </div>
-            <div>
-              <label className="text-xs text-gray-500">Dernier entretien</label>
-              <input type="date" value={form.lastMaintenanceDate} onChange={e => setForm({...form, lastMaintenanceDate: e.target.value})} className="border rounded-lg px-3 py-2 w-full" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Prochain entretien</label>
-              <input type="date" value={form.nextMaintenanceDate} onChange={e => setForm({...form, nextMaintenanceDate: e.target.value})} className="border rounded-lg px-3 py-2 w-full" />
-            </div>
             <div className="col-span-full flex gap-2">
               <button type="submit" className="bg-soltex-green text-white px-6 py-2 rounded-lg">{editing ? 'Modifier' : 'Ajouter'}</button>
               <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg">Annuler</button>
@@ -128,11 +119,6 @@ export default function Vehicles() {
             <div className="space-y-1 text-sm text-gray-500">
               <p><span className="font-medium">{v.licensePlate}</span> - {VEHICLE_TYPES.find(vt => vt.value === v.type)?.label}</p>
               <p>{v.capacity} m3 - {(v.mileage || 0).toLocaleString()} km</p>
-              {v.nextMaintenanceDate && (
-                <p className="flex items-center gap-1 text-xs">
-                  <Wrench className="w-3 h-3" /> Entretien : {new Date(v.nextMaintenanceDate).toLocaleDateString('fr-FR')}
-                </p>
-              )}
             </div>
           </div>
         ))}
