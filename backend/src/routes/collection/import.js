@@ -284,9 +284,11 @@ router.post('/tonnages', upload.single('file'), async (req, res) => {
 router.post('/seed-from-repo', async (req, res) => {
   try {
     const results = {};
+    // Dossier data : /app/data en Docker, ou ./data depuis le repo
+    const dataDir = fs.existsSync('/app/data') ? '/app/data' : path.join(__dirname, '../../../..', 'data');
 
     // 1. Import KML
-    const kmlPath = path.join(__dirname, '../../../..', 'Carte des PAV au 28-02-2026.kml');
+    const kmlPath = path.join(dataDir, 'Carte des PAV au 28-02-2026.kml');
     if (fs.existsSync(kmlPath)) {
       const content = fs.readFileSync(kmlPath, 'utf-8');
       const placemarks = content.match(/<Placemark>[\s\S]*?<\/Placemark>/g) || [];
@@ -331,7 +333,7 @@ router.post('/seed-from-repo', async (req, res) => {
     }
 
     // 2. Import tournées Excel
-    const tourneePath = path.join(__dirname, '../../../..', 'tournee.xlsx');
+    const tourneePath = path.join(dataDir, 'tournee.xlsx');
     if (fs.existsSync(tourneePath)) {
       const XLSX = require('xlsx');
       const wb = XLSX.readFile(tourneePath);
@@ -400,7 +402,7 @@ router.post('/seed-from-repo', async (req, res) => {
     }
 
     // 3. Import tonnages
-    const tonnagePath = path.join(__dirname, '../../../..', 'tonnages.xlsx');
+    const tonnagePath = path.join(dataDir, 'tonnages.xlsx');
     if (fs.existsSync(tonnagePath)) {
       const XLSX = require('xlsx');
       const wb = XLSX.readFile(tonnagePath);
