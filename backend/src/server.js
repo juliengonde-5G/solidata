@@ -4,6 +4,14 @@ const path = require('path');
 const { sequelize } = require('./models');
 const { scheduleEmailIngestion } = require('./services/emailIngestion');
 
+// Empêcher les crashs sur erreurs non gérées
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection:', err.message || err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err.message || err);
+});
+
 // Routes Recrutement
 const authRoutes = require('./routes/auth');
 const positionsRoutes = require('./routes/recruitment/positions');

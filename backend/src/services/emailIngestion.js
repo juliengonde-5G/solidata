@@ -234,8 +234,8 @@ function startEmailIngestion() {
     });
   });
 
-  imap.once('error', (err) => {
-    console.error('Erreur IMAP:', err);
+  imap.on('error', (err) => {
+    console.error('Erreur IMAP:', err.message || err);
   });
 
   imap.connect();
