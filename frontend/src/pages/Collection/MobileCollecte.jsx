@@ -81,6 +81,10 @@ export default function MobileCollecte() {
   const [showQrIssue, setShowQrIssue] = useState(null); // pointId
   const [qrIssueReason, setQrIssueReason] = useState('');
 
+  // QR-first workflow: fill level and "Collecté" only after QR scan or QR unavailable
+  const [qrValidated, setQrValidated] = useState(false);
+  const [qrNote, setQrNote] = useState('');
+
   // Truck full / return to depot
   const [showTruckFull, setShowTruckFull] = useState(false);
 
@@ -232,19 +236,33 @@ export default function MobileCollecte() {
       setExpandedPoint(null);
       setPointFillLevel(50);
       setPointNotes('');
+      setQrValidated(false);
+      setQrNote('');
     } catch (err) {
       alert(err.response?.data?.error || 'Erreur');
     }
   };
 
-  // QR code scan
+  // QR code scan — valide le QR mais ne collecte pas automatiquement
   const handleQRScan = async () => {
     if (!scanInput.trim()) return;
     try {
       const { data } = await api.get(`/collection/points/scan/${scanInput.trim()}`);
       const matchedPoint = routePoints.find(rp => rp.collectionPointId === data.id);
       if (matchedPoint) {
-        handleScan(matchedPoint.collectionPointId);
+        const nextPoint = getNextPoint();
+        if (nextPoint && matchedPoint.collectionPointId === nextPoint.collectionPointId) {
+          // QR correspond au prochain point — débloquer le remplissage
+          setQrValidated(true);
+          setQrNote('');
+        } else if (matchedPoint.status === 'a_collecter') {
+          // QR correspond à un autre point non traité — débloquer aussi
+          setQrValidated(true);
+          setQrNote('');
+        } else {
+          setScanResult({ ...data, alreadyDone: true, message: `Point "${data.name}" déjà traité` });
+          return;
+        }
         setScanMode(false);
         setScanInput('');
         setScanResult(null);
@@ -256,10 +274,11 @@ export default function MobileCollecte() {
     }
   };
 
-  // QR indisponible
-  const handleQrUnavailable = (pointId) => {
+  // QR indisponible — débloquer le remplissage avec une note
+  const handleQrUnavailable = () => {
     const reason = qrIssueReason || 'QR code indisponible';
-    handleScan(pointId, 'probleme', undefined, reason);
+    setQrValidated(true);
+    setQrNote(reason);
     setShowQrIssue(null);
     setQrIssueReason('');
   };
@@ -413,73 +432,103 @@ export default function MobileCollecte() {
               <p className="text-xs text-soltex-green font-semibold mt-1">{nextPointCavs} CAV sur cette adresse</p>
             )}
 
-            {/* Saisie remplissage avec images */}
-            <div className="mt-3">
-              <p className="text-xs text-gray-500 mb-2">Niveau de remplissage :</p>
-              {nextPointCavs > 1 ? (
-                // Saisie par CAV si plusieurs
-                <div className="space-y-2">
-                  {Array.from({ length: nextPointCavs }, (_, i) => (
-                    <div key={i} className="bg-white rounded-lg p-2">
-                      <p className="text-xs font-medium text-gray-600 mb-1">CAV {i + 1}</p>
-                      <div className="grid grid-cols-6 gap-1">
-                        {FILL_LEVELS.map(fl => (
-                          <button key={fl.value} onClick={() => {
-                            const arr = [...(Array.isArray(pointFillLevel) ? pointFillLevel : new Array(nextPointCavs).fill(50))];
-                            arr[i] = fl.value;
-                            setPointFillLevel(arr);
-                          }}
-                            className={`py-1.5 rounded-lg border-2 text-center text-[10px] font-medium transition-all ${
-                              (Array.isArray(pointFillLevel) ? pointFillLevel[i] : 50) === fl.value ? fl.color + ' border-current scale-105' : 'bg-white border-gray-200 text-gray-400'
-                            }`}
-                          >
-                            <div className="text-base">{fl.emoji}</div>
-                            <div className="leading-tight">{fl.label}</div>
-                          </button>
-                        ))}
+            {/* AVANT validation QR — demander de flasher ou signaler QR indisponible */}
+            {!qrValidated && (
+              <div className="mt-3">
+                <div className="bg-gray-50 rounded-xl p-4 text-center mb-3">
+                  <ScanLine className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500 font-medium">Flashez le QR code pour collecter ce point</p>
+                  <p className="text-xs text-gray-400 mt-1">ou indiquez QR indisponible si le code est absent</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => { handleScan(nextPt.collectionPointId, 'passe', undefined, 'Passé'); }}
+                    className="bg-yellow-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
+                    <AlertCircle className="w-4 h-4" /> Passer
+                  </button>
+                  <button onClick={() => { setShowQrIssue(nextPt.collectionPointId); setQrIssueReason(''); }}
+                    className="bg-red-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
+                    <AlertTriangle className="w-4 h-4" /> QR indisponible
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* APRÈS validation QR — saisie remplissage + collecte */}
+            {qrValidated && (
+              <div className="mt-3">
+                {qrNote && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <span className="text-xs text-amber-700 font-medium">QR : {qrNote}</span>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mb-2">Niveau de remplissage :</p>
+                {nextPointCavs > 1 ? (
+                  // Saisie par CAV si plusieurs
+                  <div className="space-y-2">
+                    {Array.from({ length: nextPointCavs }, (_, i) => (
+                      <div key={i} className="bg-white rounded-lg p-2">
+                        <p className="text-xs font-medium text-gray-600 mb-1">CAV {i + 1}</p>
+                        <div className="grid grid-cols-6 gap-1">
+                          {FILL_LEVELS.map(fl => (
+                            <button key={fl.value} onClick={() => {
+                              const arr = [...(Array.isArray(pointFillLevel) ? pointFillLevel : new Array(nextPointCavs).fill(50))];
+                              arr[i] = fl.value;
+                              setPointFillLevel(arr);
+                            }}
+                              className={`py-1.5 rounded-lg border-2 text-center text-[10px] font-medium transition-all ${
+                                (Array.isArray(pointFillLevel) ? pointFillLevel[i] : 50) === fl.value ? fl.color + ' border-current scale-105' : 'bg-white border-gray-200 text-gray-400'
+                              }`}
+                            >
+                              <div className="text-base">{fl.emoji}</div>
+                              <div className="leading-tight">{fl.label}</div>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                // Saisie unique
-                <div className="grid grid-cols-6 gap-1.5">
-                  {FILL_LEVELS.map(fl => (
-                    <button key={fl.value} onClick={() => setPointFillLevel(fl.value)}
-                      className={`py-2 rounded-xl border-2 text-center text-xs font-medium transition-all ${
-                        pointFillLevel === fl.value ? fl.color + ' border-current scale-105 shadow' : 'bg-white border-gray-200 text-gray-400'
-                      }`}
-                    >
-                      <div className="text-lg">{fl.emoji}</div>
-                      <div className="leading-tight">{fl.label}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Saisie unique
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {FILL_LEVELS.map(fl => (
+                      <button key={fl.value} onClick={() => setPointFillLevel(fl.value)}
+                        className={`py-2 rounded-xl border-2 text-center text-xs font-medium transition-all ${
+                          pointFillLevel === fl.value ? fl.color + ' border-current scale-105 shadow' : 'bg-white border-gray-200 text-gray-400'
+                        }`}
+                      >
+                        <div className="text-lg">{fl.emoji}</div>
+                        <div className="leading-tight">{fl.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-            {/* Notes */}
-            <input type="text" placeholder="Notes (optionnel)" value={pointNotes}
-              onChange={e => setPointNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm mt-2" />
+                {/* Notes */}
+                <input type="text" placeholder="Notes (optionnel)" value={pointNotes}
+                  onChange={e => setPointNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm mt-2" />
 
-            {/* Boutons d'action */}
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <button onClick={() => {
-                const avgFill = Array.isArray(pointFillLevel) ? Math.round(pointFillLevel.reduce((a, b) => a + b, 0) / pointFillLevel.length) : pointFillLevel;
-                handleScan(nextPt.collectionPointId, 'collecte', avgFill, pointNotes);
-              }}
-                className="bg-green-500 text-white rounded-lg py-3 text-sm font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1 col-span-2">
-                <CheckCircle className="w-5 h-5" /> Collecté
-              </button>
-              <button onClick={() => { handleScan(nextPt.collectionPointId, 'passe', undefined, 'Passé'); }}
-                className="bg-yellow-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
-                <AlertCircle className="w-4 h-4" /> Passer
-              </button>
-              <button onClick={() => { setShowQrIssue(nextPt.collectionPointId); setQrIssueReason(''); }}
-                className="bg-red-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
-                <AlertTriangle className="w-4 h-4" /> QR indisponible
-              </button>
-            </div>
+                {/* Boutons d'action */}
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <button onClick={() => {
+                    const avgFill = Array.isArray(pointFillLevel) ? Math.round(pointFillLevel.reduce((a, b) => a + b, 0) / pointFillLevel.length) : pointFillLevel;
+                    const combinedNotes = [qrNote, pointNotes].filter(Boolean).join(' | ');
+                    handleScan(nextPt.collectionPointId, 'collecte', avgFill, combinedNotes);
+                  }}
+                    className="bg-green-500 text-white rounded-lg py-3 text-sm font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1 col-span-2">
+                    <CheckCircle className="w-5 h-5" /> Collecté
+                  </button>
+                  <button onClick={() => { handleScan(nextPt.collectionPointId, 'passe', undefined, 'Passé'); }}
+                    className="bg-yellow-500 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
+                    <AlertCircle className="w-4 h-4" /> Passer
+                  </button>
+                  <button onClick={() => { setQrValidated(false); setQrNote(''); }}
+                    className="bg-gray-400 text-white rounded-lg py-2.5 text-xs font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1">
+                    <RotateCcw className="w-4 h-4" /> Annuler
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Navigation */}
             {nextPt.collectionPoint?.latitude && (
@@ -553,7 +602,7 @@ export default function MobileCollecte() {
               )}
               <div className="flex gap-2">
                 <button onClick={() => setShowQrIssue(null)} className="flex-1 bg-gray-200 text-gray-700 rounded-xl py-3 font-semibold">Annuler</button>
-                <button onClick={() => handleQrUnavailable(showQrIssue)} disabled={!qrIssueReason}
+                <button onClick={handleQrUnavailable} disabled={!qrIssueReason}
                   className="flex-1 bg-red-500 text-white rounded-xl py-3 font-semibold disabled:opacity-50">Confirmer</button>
               </div>
             </div>
@@ -636,9 +685,10 @@ export default function MobileCollecte() {
                 <button onClick={handleQRScan} className="bg-soltex-green text-white rounded-xl px-6 py-3 font-semibold active:scale-95 transition-transform">OK</button>
               </div>
               {scanResult && (
-                <div className={`rounded-xl p-4 ${scanResult.error ? 'bg-red-50 text-red-700' : scanResult.notInRoute ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
+                <div className={`rounded-xl p-4 ${scanResult.error ? 'bg-red-50 text-red-700' : scanResult.notInRoute ? 'bg-yellow-50 text-yellow-700' : scanResult.alreadyDone ? 'bg-gray-50 text-gray-700' : 'bg-green-50 text-green-700'}`}>
                   {scanResult.error ? <p>{scanResult.error}</p> :
                    scanResult.notInRoute ? <p>Point "{scanResult.name}" trouvé mais pas dans cette tournée</p> :
+                   scanResult.alreadyDone ? <p>{scanResult.message}</p> :
                    <p>Point "{scanResult.name}" scanné</p>}
                 </div>
               )}

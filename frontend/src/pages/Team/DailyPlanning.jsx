@@ -309,14 +309,14 @@ export default function DailyPlanning() {
               <span className={`text-xs ${colors.text} opacity-60`}>{stations.length} postes</span>
             </div>
             <div className="bg-white border border-t-0 rounded-b-xl shadow-sm divide-y">
-              {stations.map(ws => {
+              {stations.map((ws, wsIdx) => {
                 const assignment = assignMap[ws.id];
                 return (
                   <div key={ws.id} className="px-4 py-3 flex items-center gap-4 flex-wrap">
-                    {/* Nom du poste */}
+                    {/* Nom du poste — Collecte : chauffeur générique sans nom de tournée */}
                     <div className="w-48 flex-shrink-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-gray-800">{ws.name}</span>
+                        <span className="font-medium text-sm text-gray-800">{isCollecte ? `Chauffeur ${wsIdx + 1}` : ws.name}</span>
                         {ws.mandatory && (
                           <span className="bg-red-100 text-red-600 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Obligatoire</span>
                         )}
