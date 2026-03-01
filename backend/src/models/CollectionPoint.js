@@ -39,7 +39,6 @@ const CollectionPoint = sequelize.define('CollectionPoint', {
   },
   qrCode: {
     type: DataTypes.STRING,
-    unique: true,
     comment: 'Identifiant QR code unique pour scan'
   },
   contactName: {
@@ -59,7 +58,10 @@ const CollectionPoint = sequelize.define('CollectionPoint', {
   }
 }, {
   tableName: 'collection_points',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { unique: true, fields: ['qrCode'], where: { qrCode: { [require('sequelize').Op.ne]: null } } }
+  ]
 });
 
 module.exports = CollectionPoint;

@@ -115,6 +115,19 @@ async function start() {
       await sequelize.query(`UPDATE candidates SET status = 'convoque' WHERE status = 'entretien_confirme'`).catch(() => {});
       await sequelize.query(`UPDATE candidates SET status = 'recrute' WHERE status = 'recrutement_valide'`).catch(() => {});
 
+      // === Fix contrainte UNIQUE sur qrCode (collection_points) ===
+      // Supprimer l'ancienne contrainte UNIQUE inline qui bloque alter
+      await sequelize.query(`
+        DO $$ BEGIN
+          ALTER TABLE collection_points DROP CONSTRAINT IF EXISTS collection_points_qrCode_key;
+          ALTER TABLE collection_points DROP CONSTRAINT IF EXISTS "collection_points_qrCode_key";
+        EXCEPTION WHEN undefined_table THEN NULL;
+        END $$;
+      `).catch(() => {});
+      // Supprimer l'index unique s'il existe sous un autre nom
+      await sequelize.query(`DROP INDEX IF EXISTS "collection_points_qr_code"`).catch(() => {});
+      await sequelize.query(`DROP INDEX IF EXISTS "collection_points_qrCode_key"`).catch(() => {});
+
       console.log('Migration des enums terminée');
     } catch (err) {
       console.log('Migration enums (ignoré):', err.message);
