@@ -16,7 +16,7 @@ router.use(requireRole('admin'));
 // ============================================================
 router.post('/kml', upload.single('file'), async (req, res) => {
   try {
-    const content = fs.readFileSync(req.file.path, 'utf-8');
+    const content = fs.readFileSync(req.file.path, 'latin1');
     const placemarks = content.match(/<Placemark>[\s\S]*?<\/Placemark>/g) || [];
 
     let imported = 0;
@@ -37,7 +37,7 @@ router.post('/kml', upload.single('file'), async (req, res) => {
       // Format: "ROUEN - 27 rue Saint-Sever (Cours Clémenceau)<br><br>1 CAV<br>"
       const nameMatch = desc.match(/^([^<]+)/);
       if (!nameMatch) { skipped++; continue; }
-      const fullName = nameMatch[1].trim().replace(/\ufffd/g, 'é'); // Fix encoding
+      const fullName = nameMatch[1].trim();
 
       // Extraire ville et adresse
       const dashIdx = fullName.indexOf(' - ');
@@ -290,7 +290,7 @@ router.post('/seed-from-repo', async (req, res) => {
     // 1. Import KML
     const kmlPath = path.join(dataDir, 'Carte des PAV au 28-02-2026.kml');
     if (fs.existsSync(kmlPath)) {
-      const content = fs.readFileSync(kmlPath, 'utf-8');
+      const content = fs.readFileSync(kmlPath, 'latin1');
       const placemarks = content.match(/<Placemark>[\s\S]*?<\/Placemark>/g) || [];
       let kmlImported = 0;
 

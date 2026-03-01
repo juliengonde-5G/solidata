@@ -296,6 +296,82 @@ async function start() {
     // Démarrer l'aspiration email
     scheduleEmailIngestion();
 
+    // === Auto-import CAV depuis le fichier KML si la table est vide ===
+    try {
+      const { CollectionPoint } = require('./models');
+      const cavCount = await CollectionPoint.count();
+      if (cavCount === 0) {
+        const fs = require('fs');
+        const dataDir = fs.existsSync('/app/data') ? '/app/data' : path.join(__dirname, '../..', 'data');
+        const kmlPath = path.join(dataDir, 'Carte des PAV au 28-02-2026.kml');
+        if (fs.existsSync(kmlPath)) {
+          console.log('Import automatique des CAV depuis le fichier KML...');
+          const content = fs.readFileSync(kmlPath, 'latin1');
+          const placemarks = content.match(/<Placemark>[\s\S]*?<\/Placemark>/g) || [];
+          let kmlImported = 0;
+
+          for (const pm of placemarks) {
+            const descMatch = pm.match(/<description><!\[CDATA\[([\s\S]*?)\]\]>/);
+            if (!descMatch) continue;
+            const desc = descMatch[1];
+            const coordMatch = pm.match(/<coordinates>([\d.,-]+)/);
+            if (!coordMatch) continue;
+            const [lng, lat] = coordMatch[1].split(',').map(Number);
+            const nameMatch = desc.match(/^([^<]+)/);
+            if (!nameMatch) continue;
+
+            const fullName = nameMatch[1].trim();
+
+            const dashIdx = fullName.indexOf(' - ');
+            let city = '', address = '', complement = '';
+            if (dashIdx > -1) {
+              city = fullName.substring(0, dashIdx).trim();
+              const rest = fullName.substring(dashIdx + 3).trim();
+              const parenMatch = rest.match(/^(.*?)\s*\(([^)]+)\)/);
+              if (parenMatch) { address = parenMatch[1].trim(); complement = parenMatch[2].trim(); }
+              else { address = rest; }
+            } else { city = fullName; }
+
+            // Capitaliser la ville proprement
+            city = city.split(/[\s-]+/).map(w => {
+              if (['DE', 'DU', 'LE', 'LA', 'LES', 'EN', 'SUR', 'SOUS', 'ET', 'AU', 'AUX'].includes(w.toUpperCase()) && w.length <= 3) {
+                return w.toLowerCase();
+              }
+              return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+            }).join(city.includes('-') ? '-' : ' ')
+              .replace(/^(.)/, c => c.toUpperCase()); // Première lettre majuscule
+
+            const cavMatch = desc.match(/(\d+)\s*CAV/);
+            const nbCav = cavMatch ? parseInt(cavMatch[1]) : 1;
+            const tourMatch = desc.match(/(\d+)\s*tourn/);
+            const freq = tourMatch ? parseInt(tourMatch[1]) : 1;
+            const fillMatch = desc.match(/remplissage\s*(?:moyen\s*)?(\d+)%/);
+            const fillRate = fillMatch ? parseInt(fillMatch[1]) : null;
+            const collMatch = desc.match(/Collect[ée]\s*(\d+)\s*fois/i);
+            const collCount = collMatch ? parseInt(collMatch[1]) : 0;
+
+            const qrCode = `ST-${require('uuid').v4().slice(0, 8).toUpperCase()}`;
+
+            await CollectionPoint.findOrCreate({
+              where: { name: fullName },
+              defaults: {
+                type: 'cav', address, addressComplement: complement, city,
+                latitude: lat, longitude: lng, nbCav, frequence: freq,
+                avgFillRate: fillRate, totalCollections2025: collCount,
+                qrCode, active: true
+              }
+            });
+            kmlImported++;
+          }
+          console.log(`${kmlImported} points de collecte importés depuis le KML`);
+        }
+      } else {
+        console.log(`${cavCount} points de collecte déjà en base`);
+      }
+    } catch (seedErr) {
+      console.warn('Auto-import CAV ignoré:', seedErr.message);
+    }
+
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Solidata API démarrée sur le port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
