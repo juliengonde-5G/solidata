@@ -113,10 +113,10 @@ POSTGRES_DB=solidata
 # --- Backend ---
 DATABASE_URL=postgresql+asyncpg://solidata:${PG_PASSWORD}@db:5432/solidata
 JWT_SECRET=${JWT_SECRET}
-CORS_ORIGINS=https://solidata.fr,https://www.solidata.fr
+CORS_ORIGINS=https://solidata.online,https://www.solidata.online
 
 # --- Domaine ---
-DOMAIN=solidata.fr
+DOMAIN=solidata.online
 EOF
 
     info "Fichier .env créé avec des secrets forts."
@@ -196,14 +196,14 @@ echo "  Conteneurs  : docker compose ps"
 echo "  Logs        : docker compose logs -f"
 echo ""
 echo "  PROCHAINES ÉTAPES :"
-echo "  1. Configurer le DNS (solidata.fr → $(curl -s ifconfig.me))"
+echo "  1. Configurer le DNS (solidata.online → $(curl -s ifconfig.me))"
 echo "  2. Obtenir le certificat SSL :"
 echo "     docker run --rm \\"
 echo "       -v ./certbot/conf:/etc/letsencrypt \\"
 echo "       -v ./certbot/www:/var/www/certbot \\"
 echo "       certbot/certbot certonly \\"
 echo "       --webroot --webroot-path=/var/www/certbot \\"
-echo "       -d solidata.fr -d www.solidata.fr \\"
+echo "       -d solidata.online -d www.solidata.online \\"
 echo "       --email votre@email.fr \\"
 echo "       --agree-tos --no-eff-email"
 echo "  3. Relancer : docker compose restart frontend"
