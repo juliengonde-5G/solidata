@@ -1,0 +1,111 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: #f5f7fa;
+  color: #333;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background: #008678;
+  color: white;
+  padding: 2rem;
+  text-align: center;
+}
+
+.header h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  font-weight: 300;
+  opacity: 0.9;
+  margin-top: 0.3rem;
+}
+
+.main {
+  flex: 1;
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  width: 100%;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 2rem;
+}
+
+.card h2 {
+  color: #008678;
+  margin-bottom: 0.5rem;
+}
+
+.status {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  background: #f5f7fa;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-label {
+  font-weight: 500;
+}
+
+.status-value.ok {
+  color: #008678;
+  font-weight: 600;
+}
+
+.status-value.error {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.modules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.module-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #008678;
+}
+
+.module-card h3 {
+  color: #008678;
+  margin-bottom: 0.3rem;
+}
+
+.module-card p {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.footer {
+  text-align: center;
+  padding: 1.5rem;
+  color: #999;
+  font-size: 0.85rem;
+}
