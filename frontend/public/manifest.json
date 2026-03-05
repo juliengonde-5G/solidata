@@ -1,0 +1,10 @@
+{
+  "short_name": "Solidata",
+  "name": "Solidata - Collecte Textile",
+  "icons": [],
+  "start_url": "/?mobile=1",
+  "display": "standalone",
+  "theme_color": "#008678",
+  "background_color": "#FFFAF6",
+  "orientation": "portrait"
+}
