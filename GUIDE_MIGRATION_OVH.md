@@ -1,4 +1,4 @@
-# Guide de migration Solidata vers OVH Public Cloud
+# Guide de migration Solidata vers OVH VPS Essential
 
 ## Situation actuelle
 
@@ -14,7 +14,7 @@
 
 ---
 
-## Architecture cible OVH Public Cloud
+## Architecture cible OVH VPS Essential
 
 ```
                     ┌─────────────────────────┐
@@ -22,48 +22,66 @@
                     │  ex: solidata.fr         │
                     └────────┬────────────────┘
                              │
-                    ┌────────▼────────────────┐
-                    │   Reverse Proxy Nginx    │
-                    │   + Let's Encrypt HTTPS  │
-                    │   Port 443 / 80          │
-                    └────────┬────────────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │              │              │
-     ┌────────▼───┐  ┌──────▼─────┐ ┌──────▼──────┐
-     │  Frontend   │  │  Backend   │ │ PostgreSQL  │
-     │  Nginx :80  │  │ FastAPI    │ │ + PostGIS   │
-     │  (React)    │  │ :8000      │ │ :5432       │
-     └─────────────┘  └────────────┘ └─────────────┘
-                                          │
-                                    ┌─────▼─────┐
-                                    │  Volume    │
-                                    │ persistant │
-                                    └───────────┘
+              ┌──────────────▼──────────────────┐
+              │    OVH VPS Essential             │
+              │    2 vCPU · 4 Go RAM · 80 Go SSD│
+              │    Ubuntu 24.04 LTS              │
+              │                                  │
+              │  ┌────────────────────────────┐  │
+              │  │  Docker Compose            │  │
+              │  │                            │  │
+              │  │  ┌──────────────────────┐  │  │
+              │  │  │ Nginx (reverse proxy)│  │  │
+              │  │  │ + Let's Encrypt HTTPS│  │  │
+              │  │  │ :80 / :443          │  │  │
+              │  │  └──────────┬───────────┘  │  │
+              │  │             │              │  │
+              │  │    ┌────────┴────────┐     │  │
+              │  │    │                 │     │  │
+              │  │  ┌─▼──────┐  ┌──────▼──┐  │  │
+              │  │  │Frontend│  │ Backend │  │  │
+              │  │  │ React  │  │ FastAPI │  │  │
+              │  │  │ (SPA)  │  │ :8000   │  │  │
+              │  │  └────────┘  └────┬────┘  │  │
+              │  │                   │       │  │
+              │  │            ┌──────▼──────┐│  │
+              │  │            │ PostgreSQL  ││  │
+              │  │            │ + PostGIS   ││  │
+              │  │            │ :5432       ││  │
+              │  │            └──────┬──────┘│  │
+              │  │                   │       │  │
+              │  └───────────────────┼───────┘  │
+              │               ┌──────▼──────┐   │
+              │               │  Volume 80Go│   │
+              │               │  SSD NVMe   │   │
+              │               └─────────────┘   │
+              └─────────────────────────────────┘
 ```
 
 ---
 
-## Étape 1 — Créer un compte OVH et commander une instance
+## Étape 1 — Commander le VPS OVH
 
 ### 1.1 Créer un compte OVH
-- Aller sur [https://www.ovhcloud.com/fr/public-cloud/](https://www.ovhcloud.com/fr/public-cloud/)
+- Aller sur [https://www.ovhcloud.com/fr/vps/](https://www.ovhcloud.com/fr/vps/)
 - Créer un compte ou se connecter
-- Créer un **projet Public Cloud** (gratuit, on ne paie que les ressources)
 
-### 1.2 Choisir l'instance
+### 1.2 Commander le VPS Essential
 
-Pour Solidata (application légère, ~30 utilisateurs), l'offre recommandée :
+| Paramètre | Valeur |
+|-----------|--------|
+| **Offre** | **VPS Essential** |
+| **Prix** | **12,50 € HT/mois** |
+| **vCPU** | 2 |
+| **RAM** | 4 Go |
+| **Stockage** | 80 Go SSD NVMe |
+| **Bande passante** | 500 Mbps illimité |
+| **Datacenter** | **Gravelines (GRA)** ou **Strasbourg (SBG)** — France |
+| **OS** | **Ubuntu 24.04 LTS** |
+| **Sauvegardes auto** | Incluses (quotidiennes) |
+| **SLA** | 99,9% |
 
-| Paramètre | Recommandation |
-|-----------|---------------|
-| **Modèle** | **B2-7** (2 vCPU, 7 Go RAM) — ~12€/mois |
-| **Région** | **GRA** (Gravelines) ou **SBG** (Strasbourg) — France |
-| **Image** | **Ubuntu 24.04 LTS** |
-| **Stockage** | 50 Go SSD inclus (suffisant) |
-| **Réseau** | IP publique incluse |
-
-> **Alternative économique** : **D2-2** (1 vCPU, 2 Go RAM) à ~5€/mois peut suffire pour démarrer, mais sera limité si les données grossissent.
+> **Astuce** : Souscrire **avant le 1er avril 2026** avec un engagement 6 ou 12 mois pour bloquer le tarif actuel (hausse de ~45% prévue après cette date).
 
 ### 1.3 Ajouter une clé SSH
 ```bash
@@ -73,14 +91,16 @@ ssh-keygen -t ed25519 -C "solidata-ovh"
 # Copier la clé publique
 cat ~/.ssh/id_ed25519.pub
 ```
-Coller cette clé dans le formulaire OVH lors de la création de l'instance.
+Coller cette clé dans le formulaire OVH lors de la commande du VPS.
 
 ---
 
 ## Étape 2 — Configurer le serveur
 
-### 2.1 Se connecter à l'instance
+### 2.1 Se connecter au VPS
 ```bash
+# L'IP publique est fournie par OVH après la commande
+# L'utilisateur par défaut sur Ubuntu est "ubuntu"
 ssh ubuntu@<IP_PUBLIQUE_OVH>
 ```
 
@@ -448,20 +468,33 @@ echo "Déploiement terminé à $(date)"
 
 ## Récapitulatif des coûts estimés
 
-| Service | Coût mensuel |
-|---------|-------------|
-| Instance B2-7 (2 vCPU, 7 Go RAM) | ~12 € |
-| Nom de domaine .fr | ~0,60 € (7€/an) |
+| Service | Coût mensuel HT |
+|---------|-----------------|
+| VPS Essential (2 vCPU, 4 Go RAM, 80 Go SSD NVMe) | 12,50 € |
+| Nom de domaine .fr (optionnel) | ~0,60 € (7€/an) |
 | Certificat SSL (Let's Encrypt) | Gratuit |
-| Stockage 50 Go SSD (inclus) | Inclus |
-| **Total** | **~13 €/mois** |
+| Sauvegardes automatiques | Incluses |
+| Bande passante 500 Mbps illimitée | Incluse |
+| **Total** | **~13 €/mois HT** |
+
+### Comparaison avec l'ancienne recommandation
+
+| | Public Cloud B2-7 | **VPS Essential** |
+|--|-------------------|-------------------|
+| Prix | ~12 €/mois | **12,50 €/mois** |
+| vCPU | 2 | 2 |
+| RAM | 7 Go | 4 Go (suffisant) |
+| Stockage | 50 Go SSD | **80 Go SSD NVMe** |
+| Bande passante | Variable | **500 Mbps illimité** |
+| Sauvegardes auto | Payant | **Incluses** |
+| Gestion | API/Console Cloud | **Simple (panneau VPS)** |
 
 ---
 
 ## Checklist de migration
 
-- [ ] Créer un compte OVH Public Cloud
-- [ ] Commander une instance B2-7 (Ubuntu 24.04, région GRA ou SBG)
+- [ ] Créer un compte OVH
+- [ ] Commander un VPS Essential (Ubuntu 24.04, datacenter GRA ou SBG)
 - [ ] Configurer la clé SSH
 - [ ] Se connecter et installer Docker
 - [ ] Configurer le firewall (UFW)
@@ -478,6 +511,60 @@ echo "Déploiement terminé à $(date)"
 - [ ] Mettre à jour les URLs dans `config.py` (CORS, etc.)
 - [ ] Tester le PWA mobile avec le nouveau domaine
 - [ ] Couper l'ancien serveur Synology (après validation)
+
+---
+
+## Optimisations pour le VPS Essential (4 Go RAM)
+
+Le VPS Essential a 4 Go de RAM, ce qui est suffisant mais demande quelques optimisations.
+
+### Ajouter du swap (recommandé)
+```bash
+# Créer 2 Go de swap
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Rendre permanent
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Optimiser le swappiness (utiliser swap uniquement si nécessaire)
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+### Limiter la mémoire PostgreSQL
+
+Ajouter dans le `docker-compose.yml` pour le service `db` :
+```yaml
+  db:
+    image: postgis/postgis:15-3.4-alpine
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    environment:
+      # Optimisations PostgreSQL pour 4 Go RAM
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_WORK_MEM: 16MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
+```
+
+### Répartition mémoire cible
+
+| Conteneur | RAM estimée |
+|-----------|------------|
+| PostgreSQL + PostGIS | ~800 Mo |
+| FastAPI backend | ~300 Mo |
+| Nginx + React (statique) | ~50 Mo |
+| Système Ubuntu | ~500 Mo |
+| **Total utilisé** | **~1,7 Go** |
+| **Marge restante** | **~2,3 Go** |
+| **Swap (secours)** | 2 Go |
+
+Avec 4 Go de RAM et 2 Go de swap, Solidata tournera confortablement.
 
 ---
 
