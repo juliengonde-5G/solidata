@@ -132,12 +132,17 @@ cd solidata
 
 > **Note** : Le repo actuel ne contient pas encore les fichiers Docker. Il faudra les recréer ou les récupérer depuis le Synology.
 
-### 3.2 Récupérer les fichiers Docker depuis le Synology
+### 3.2 Récupérer les données depuis le Synology
+
+Les fichiers Docker (docker-compose.yml, Dockerfiles, nginx.conf) sont désormais dans le repo Git.
+Il reste à récupérer le **dump de la base de données** et éventuellement les **fichiers uploadés** :
+
 ```bash
-# Depuis le Synology, copier les fichiers essentiels :
-scp -r user@82.65.155.79:/chemin/solidata/docker-compose.yml ubuntu@<IP_OVH>:/home/ubuntu/solidata/
-scp -r user@82.65.155.79:/chemin/solidata/backend/ ubuntu@<IP_OVH>:/home/ubuntu/solidata/backend/
-scp -r user@82.65.155.79:/chemin/solidata/frontend/ ubuntu@<IP_OVH>:/home/ubuntu/solidata/frontend/
+# Chemin sur le Synology : /volume1/docker/soltext-app
+
+# Exporter la BDD depuis le Synology (voir Étape 5)
+# Récupérer les fichiers uploadés (photos, CVs) si nécessaire :
+scp -r user@82.65.155.79:/volume1/docker/soltext-app/uploads/ ubuntu@<IP_OVH>:/home/ubuntu/solidata/uploads/
 ```
 
 ---

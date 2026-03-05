@@ -1,0 +1,29 @@
+# Secrets
+.env
+*.dump
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Certbot / SSL
+certbot/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Backups
+backups/
