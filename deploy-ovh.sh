@@ -72,11 +72,17 @@ info "Firewall activé (ports 22, 80, 443)."
 # 5. CLONER LE REPO
 # ============================================================
 APP_DIR="/home/$USER/solidata"
+BRANCH="main"
 
 if [ -d "$APP_DIR" ]; then
     info "Le répertoire $APP_DIR existe déjà, mise à jour..."
     cd "$APP_DIR"
-    git pull origin main
+    # Détecter la branche courante
+    CURRENT=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [ -n "$CURRENT" ]; then
+        BRANCH="$CURRENT"
+    fi
+    git pull origin "$BRANCH"
 else
     info "Clonage du dépôt..."
     cd "/home/$USER"
