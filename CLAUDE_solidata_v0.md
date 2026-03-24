@@ -26,7 +26,7 @@
 ## 2. STACK TECHNIQUE
 
 ### Infrastructure
-- **Serveur** : Synology DS 220+ — port 8083
+- **Serveur** : VPS Scaleway (anciennement Synology DS 220+)
 - **IP publique** : 82.65.155.79:8083
 - **GitHub** : juliengonde-5G/solidata
 
